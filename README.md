@@ -5,7 +5,7 @@ pedidos direto do celular, no lugar do preenchimento manual da planilha.
 Funciona **mesmo sem internet** e gera o pedido pronto em Excel e PDF, no
 mesmo modelo já usado hoje pela empresa.
 
-**Teste agora:** [sistema-pedidos-dr-system.vercel.app](https://https://sistema-pedidos-dr-system.vercel.app/)
+**Teste agora:** [sistema-pedidos-dr-system.vercel.app](https://sistema-pedidos-dr-system.vercel.app/)
 — abra o link no celular e, se quiser, use a opção "Adicionar à tela
 inicial" do navegador para instalar como um app normal.
 
