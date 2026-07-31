@@ -1,0 +1,147 @@
+:root {
+  --cor-primaria: #1d4ed8;
+  --cor-primaria-escura: #1e40af;
+  --cor-primaria-clara: #eff6ff;
+  --cor-texto: #0f172a;
+  --cor-texto-suave: #64748b;
+  --cor-borda: #e2e8f0;
+  --cor-fundo: #f8fafc;
+  --cor-superficie: #ffffff;
+  --cor-sucesso: #15803d;
+  --cor-sucesso-fundo: #f0fdf4;
+  --cor-alerta: #b45309;
+  --cor-alerta-fundo: #fffbeb;
+  --cor-erro: #b91c1c;
+  --cor-erro-fundo: #fef2f2;
+
+  --raio: 12px;
+  --raio-pequeno: 8px;
+  --sombra: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.1);
+  --alvo-toque: 44px;
+
+  --espaco-topo: env(safe-area-inset-top, 0px);
+  --espaco-base: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.25rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--cor-primaria);
+}
+
+/* Layout base das telas */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 560px;
+  margin: 0 auto;
+  background: var(--cor-fundo);
+}
+
+.app-conteudo {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: calc(24px + var(--espaco-base));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-conteudo--com-barra {
+  padding-bottom: calc(96px + var(--espaco-base));
+}
+
+.pilha {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pilha--apertada {
+  gap: 8px;
+}
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.linha--entre {
+  justify-content: space-between;
+}
+
+.texto-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+}
+
+.texto-erro {
+  color: var(--cor-erro);
+  font-size: 0.875rem;
+}
+
+.texto-forte {
+  font-weight: 600;
+}
+
+.secao-titulo {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+  margin-top: 4px;
+}

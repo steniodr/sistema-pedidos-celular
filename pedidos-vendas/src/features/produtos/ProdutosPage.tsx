@@ -1,0 +1,83 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useRepository } from "../../data/RepositoryContext";
+import { useDados } from "../../hooks/useDados";
+import { Button, LinkButton } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Field";
+import { BarraInferior, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { formatarMoeda } from "../../domain/calculos";
+import { AvisoBase } from "./AvisoBase";
+import { avaliarBase, formatarDataHora } from "./statusBase";
+import css from "./produtos.module.css";
+
+export function ProdutosPage() {
+  const repo = useRepository();
+  const navigate = useNavigate();
+  const [busca, setBusca] = useState("");
+
+  const { dados: produtos } = useDados(() => repo.listarProdutos(busca, 100), [repo, busca]);
+  const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
+
+  const status = avaliarBase(importacao);
+
+  return (
+    <Tela titulo="Base de produtos" voltar="/" comBarraInferior>
+      <AvisoBase status={status} sempreVisivel />
+      {importacao && (
+        <p className="texto-suave">
+          {importacao.totalProdutos} produtos · arquivo “{importacao.arquivo}” ·{" "}
+          {formatarDataHora(importacao.quandoEm)}
+        </p>
+      )}
+
+      <Input
+        rotulo="Buscar produto"
+        placeholder="Ex.: esmalte galão"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        autoComplete="off"
+      />
+
+      {produtos?.length === 0 ? (
+        <EstadoVazio
+          titulo={busca ? "Nenhum produto encontrado" : "Base vazia"}
+          descricao="Importe a planilha de preços ou cadastre um produto."
+        />
+      ) : (
+        <div>
+          {produtos?.map((produto) => (
+            <div key={produto.id} className={css.listaProduto}>
+              <div className={css.listaProdutoInfo}>
+                <div>
+                  {produto.nome}
+                  {produto.detalhes ? ` (${produto.detalhes})` : ""}
+                </div>
+                <div className="texto-suave">{produto.embalagem}</div>
+              </div>
+              <span className="texto-forte">{formatarMoeda(produto.valorUnit)}</span>
+              <Button
+                variante="fantasma"
+                className={css.botaoEditarProduto}
+                aria-label={`Editar ${produto.nome}`}
+                onClick={() => navigate(`/produtos/${produto.id}`)}
+              >
+                ✎
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <BarraInferior>
+        <div className={css.botoesRodape}>
+          <LinkButton to="/produtos/novo" variante="secundario" bloco>
+            Novo produto
+          </LinkButton>
+          <LinkButton to="/produtos/importar" bloco>
+            Importar base
+          </LinkButton>
+        </div>
+      </BarraInferior>
+    </Tela>
+  );
+}

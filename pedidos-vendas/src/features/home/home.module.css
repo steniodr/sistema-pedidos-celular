@@ -1,0 +1,31 @@
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px;
+  padding-top: calc(16px + var(--espaco-topo));
+  background: linear-gradient(135deg, #1c73b7, #12325c);
+  color: #fff;
+}
+
+.cabecalho h1 {
+  color: #fff;
+}
+
+.botaoConfig {
+  color: #fff;
+}
+
+.atalhos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.atalhoHistorico {
+  grid-column: 1 / -1;
+}

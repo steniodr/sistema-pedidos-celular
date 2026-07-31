@@ -1,0 +1,294 @@
+/* ---------- Botão ---------- */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--alvo-toque);
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.botao--bloco {
+  width: 100%;
+}
+
+.botao--primario {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.botao--primario:active:not(:disabled) {
+  background: var(--cor-primaria-escura);
+}
+
+.botao--secundario {
+  background: var(--cor-superficie);
+  color: var(--cor-primaria);
+  border-color: var(--cor-borda);
+}
+
+.botao--fantasma {
+  background: transparent;
+  color: var(--cor-texto-suave);
+}
+
+.botao--perigo {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+  border-color: #fecaca;
+}
+
+.botao--grande {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+/* ---------- Campo ---------- */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.campoRotulo {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.campoObrigatorio {
+  color: var(--cor-erro);
+}
+
+.campoControle {
+  width: 100%;
+  min-height: var(--alvo-toque);
+  padding: 10px 12px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  outline: none;
+}
+
+.campoControle:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px var(--cor-primaria-clara);
+}
+
+.campoControle--invalido {
+  border-color: var(--cor-erro);
+}
+
+.campoAjuda {
+  font-size: 0.8125rem;
+  color: var(--cor-texto-suave);
+}
+
+.campoErro {
+  font-size: 0.8125rem;
+  color: var(--cor-erro);
+}
+
+/* ---------- Chip ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.chip--ativo {
+  background: var(--cor-primaria);
+  border-color: var(--cor-primaria);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---------- Cartão ---------- */
+.cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 14px;
+  box-shadow: var(--sombra);
+}
+
+.cartao--clicavel {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  display: block;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cartao--clicavel:active {
+  background: var(--cor-primaria-clara);
+}
+
+/* ---------- Estado vazio ---------- */
+.vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+
+.vazioTitulo {
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+/* ---------- Bottom sheet ---------- */
+.sheetFundo {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 85dvh;
+  overflow-y: auto;
+  background: var(--cor-superficie);
+  border-radius: var(--raio) var(--raio) 0 0;
+  padding: 16px;
+  padding-bottom: calc(16px + var(--espaco-base));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sheetCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ---------- Toast ---------- */
+.toasts {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(24px + var(--espaco-base));
+  width: min(520px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 14px;
+  border-radius: var(--raio-pequeno);
+  color: #fff;
+  background: #0f172a;
+  box-shadow: var(--sombra);
+  font-size: 0.9375rem;
+}
+
+.toast--erro {
+  background: var(--cor-erro);
+}
+
+.toast--sucesso {
+  background: var(--cor-sucesso);
+}
+
+/* ---------- Status do pedido ---------- */
+.status--rascunho {
+  color: var(--cor-alerta);
+  font-weight: 600;
+}
+
+.status--enviado {
+  color: var(--cor-sucesso);
+  font-weight: 600;
+}
+
+/* ---------- Barra superior ---------- */
+.barraTopo {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px;
+  padding-top: calc(12px + var(--espaco-topo));
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.barraTopoTitulo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barraVoltar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--alvo-toque);
+  height: var(--alvo-toque);
+  margin-left: -8px;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+/* ---------- Barra inferior fixa ---------- */
+.barraBase {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + var(--espaco-base));
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 30;
+}
