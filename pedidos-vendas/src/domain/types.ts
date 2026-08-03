@@ -25,6 +25,8 @@ export interface Cliente {
   obsGerais?: string;
   /** Situação do cliente vinda da base importada (ex.: "Ativo", "Inativo"); texto livre, sem lista fechada. */
   situacao?: string;
+  /** Criado pelo gerador de dados de teste (Configurações) — nunca vem de cadastro/importação real. */
+  teste?: boolean;
   criadoEm: ISODateTime;
   atualizadoEm: ISODateTime;
 }
@@ -80,6 +82,8 @@ export interface Pedido {
   /** Justificativa do desconto (quem autorizou, motivo), opcional. */
   descontoDescricao?: string;
   status: StatusPedido;
+  /** Criado pelo gerador de dados de teste (Configurações) — excluído dos totais de Relatórios. */
+  teste?: boolean;
   criadoEm: ISODateTime;
   atualizadoEm: ISODateTime;
 }

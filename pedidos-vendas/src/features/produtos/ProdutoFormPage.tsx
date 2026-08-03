@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/Confirm";
 import { Input } from "../../components/ui/Field";
 import { BarraInferior, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
@@ -16,6 +17,7 @@ export function ProdutoFormPage() {
   const repo = useRepository();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirmar = useConfirm();
   const { id } = useParams();
 
   const [form, setForm] = useState<EntradaProdutoUnico>(VAZIO);
@@ -65,9 +67,12 @@ export function ProdutoFormPage() {
 
   async function excluir() {
     if (!id || !produto) return;
-    if (!window.confirm(`Excluir o produto "${produto.nome}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+    const ok = await confirmar({
+      mensagem: `Excluir o produto "${produto.nome}"? Esta ação não pode ser desfeita.`,
+      textoConfirmar: "Excluir",
+      perigo: true,
+    });
+    if (!ok) return;
     setExcluindo(true);
     try {
       await repo.removerProduto(id);

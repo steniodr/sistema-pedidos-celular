@@ -44,6 +44,7 @@ export function ImportarClientesPage() {
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [planilha, setPlanilha] = useState<PlanilhaLidaClientes | null>(null);
   const [mapeamento, setMapeamento] = useState<MapeamentoClientes | null>(null);
+  const [colunasAbertas, setColunasAbertas] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
@@ -65,7 +66,9 @@ export function ImportarClientesPage() {
       setPlanilha(lida);
       setMapeamento(lida.mapeamento);
       setNomeArquivo(arquivo.name);
-      if (lida.linhaCabecalho === -1) {
+      const cabecalhoNaoIdentificado = lida.linhaCabecalho === -1;
+      setColunasAbertas(cabecalhoNaoIdentificado);
+      if (cabecalhoNaoIdentificado) {
         toast.info("Não identifiquei o cabeçalho. Confira as colunas abaixo.");
       }
     } catch (e) {
@@ -120,28 +123,37 @@ export function ImportarClientesPage() {
 
       {planilha && mapeamento && (
         <>
-          <h2 className="secao-titulo">Colunas</h2>
-          {(Object.keys(ROTULOS) as CampoCliente[]).map((campo) => (
-            <Select
-              key={campo}
-              rotulo={ROTULOS[campo]}
-              value={mapeamento[campo] ?? ""}
-              obrigatorio={CAMPOS_OBRIGATORIOS.includes(campo)}
-              onChange={(e) =>
-                setMapeamento({
-                  ...mapeamento,
-                  [campo]: e.target.value === "" ? null : Number(e.target.value),
-                })
-              }
-            >
-              <option value="">— não usar —</option>
-              {colunas.map((nome, indice) => (
-                <option key={indice} value={indice}>
-                  {nome || `Coluna ${indice + 1}`}
-                </option>
-              ))}
-            </Select>
-          ))}
+          <div className="linha linha--entre">
+            <h2 className="secao-titulo">Colunas</h2>
+            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
+              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
+            </Button>
+          </div>
+          {!colunasAbertas && (
+            <p className="texto-suave">Colunas identificadas automaticamente.</p>
+          )}
+          {colunasAbertas &&
+            (Object.keys(ROTULOS) as CampoCliente[]).map((campo) => (
+              <Select
+                key={campo}
+                rotulo={ROTULOS[campo]}
+                value={mapeamento[campo] ?? ""}
+                obrigatorio={CAMPOS_OBRIGATORIOS.includes(campo)}
+                onChange={(e) =>
+                  setMapeamento({
+                    ...mapeamento,
+                    [campo]: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
+            ))}
         </>
       )}
 
@@ -182,10 +194,8 @@ export function ImportarClientesPage() {
           )}
 
           {resultado.ignorados.length > 0 && (
-            <details>
-              <summary className="texto-suave">
-                Ver linhas com aviso ({resultado.ignorados.length})
-              </summary>
+            <details className={css.detalhesAviso}>
+              <summary>Ver linhas com aviso ({resultado.ignorados.length})</summary>
               <ul className="texto-suave">
                 {resultado.ignorados.slice(0, 30).map((ig, i) => (
                   <li key={i}>

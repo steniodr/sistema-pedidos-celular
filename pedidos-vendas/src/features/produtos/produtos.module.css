@@ -39,8 +39,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--cor-borda);
 }
 
 .listaProdutoInfo {
@@ -113,4 +111,23 @@
 .resumoImportValor {
   font-size: 1.25rem;
   font-weight: 700;
+}
+
+.detalhesAviso {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  padding: 12px 14px;
+  font-size: 0.9375rem;
+}
+
+.detalhesAviso summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.detalhesAviso ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
 }

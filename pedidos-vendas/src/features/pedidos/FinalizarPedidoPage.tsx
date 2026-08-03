@@ -3,9 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/Confirm";
 import { Input } from "../../components/ui/Field";
 import { SelectComOutro } from "../../components/ui/SelectComOutro";
-import { Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { StatusPedido } from "../../components/ui/StatusPedido";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
@@ -24,6 +25,7 @@ export function FinalizarPedidoPage() {
   const navigate = useNavigate();
   const repo = useRepository();
   const toast = useToast();
+  const confirmar = useConfirm();
   const { pedido, cliente, carregando, atualizar } = usePedido(id);
   const [exportando, setExportando] = useState<"excel" | "pdf" | null>(null);
   const [exportado, setExportado] = useState(false);
@@ -35,7 +37,13 @@ export function FinalizarPedidoPage() {
     void modeloDisponivel().then(setTemModelo);
   }, []);
 
-  if (carregando) return <Tela titulo="Finalizar" voltar={true}>{null}</Tela>;
+  if (carregando) {
+    return (
+      <Tela titulo="Finalizar" voltar={true}>
+        <p className="texto-suave">Carregando…</p>
+      </Tela>
+    );
+  }
   if (!pedido) {
     return (
       <Tela titulo="Finalizar" voltar="/">
@@ -61,9 +69,10 @@ export function FinalizarPedidoPage() {
   async function exportar(formato: "excel" | "pdf") {
     if (!pedido || !podeExportar) return;
     if (statusBase.nivel === "critico") {
-      const confirmado = window.confirm(
-        `${statusBase.mensagem} Os preços deste pedido podem estar desatualizados. Finalizar mesmo assim?`,
-      );
+      const confirmado = await confirmar({
+        mensagem: `${statusBase.mensagem} Os preços deste pedido podem estar desatualizados. Finalizar mesmo assim?`,
+        textoConfirmar: "Finalizar mesmo assim",
+      });
       if (!confirmado) return;
     }
     setExportando(formato);
@@ -98,7 +107,12 @@ export function FinalizarPedidoPage() {
   }
 
   return (
-    <Tela titulo="Finalizar pedido" voltar={`/pedidos/${pedido.id}`}>
+    <Tela
+      titulo="Finalizar pedido"
+      voltar={`/pedidos/${pedido.id}`}
+      comBarraInferior
+      barraInferiorAlta
+    >
       <Cartao>
         <div className="linha linha--entre">
           <span className="texto-forte">Pedido nº {pedido.numero}</span>
@@ -167,20 +181,6 @@ export function FinalizarPedidoPage() {
         </p>
       )}
       <div className={css.exportacoes}>
-        <Button bloco disabled={!podeExportar || exportando !== null} onClick={() => exportar("excel")}>
-          {exportando === "excel" ? "Gerando…" : "Exportar Excel (.xlsx)"}
-        </Button>
-        <Button
-          variante="secundario"
-          bloco
-          disabled={!podeExportar || exportando !== null}
-          onClick={() => exportar("pdf")}
-        >
-          {exportando === "pdf" ? "Gerando…" : "Exportar PDF"}
-        </Button>
-      </div>
-
-      <div className={css.exportacoes}>
         {exportado && (
           <Button bloco onClick={() => navigate("/")}>
             Voltar ao início
@@ -190,6 +190,22 @@ export function FinalizarPedidoPage() {
           Salvar rascunho e voltar
         </Button>
       </div>
+
+      <BarraInferior>
+        <div className={css.exportacoes}>
+          <Button bloco disabled={!podeExportar || exportando !== null} onClick={() => exportar("excel")}>
+            {exportando === "excel" ? "Gerando…" : "Exportar Excel (.xlsx)"}
+          </Button>
+          <Button
+            variante="secundario"
+            bloco
+            disabled={!podeExportar || exportando !== null}
+            onClick={() => exportar("pdf")}
+          >
+            {exportando === "pdf" ? "Gerando…" : "Exportar PDF"}
+          </Button>
+        </div>
+      </BarraInferior>
     </Tela>
   );
 }

@@ -174,7 +174,13 @@ export function ItemPedidoPage() {
     }
   }
 
-  if (carregando) return <Tela titulo="Item" voltar={true}>{null}</Tela>;
+  if (carregando) {
+    return (
+      <Tela titulo="Item" voltar={true}>
+        <p className="texto-suave">Carregando…</p>
+      </Tela>
+    );
+  }
   if (!pedido) {
     return (
       <Tela titulo="Item" voltar="/">

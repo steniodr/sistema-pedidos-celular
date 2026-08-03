@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button, LinkButton } from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/Confirm";
 import { Cartao, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { mensagemErro } from "../../domain/erros";
@@ -16,8 +17,10 @@ import { VERSAO_APP } from "../../versaoApp";
 export function ConfigPage() {
   const repo = useRepository();
   const toast = useToast();
+  const confirmar = useConfirm();
   const [semeando, setSemeando] = useState(false);
   const [semeandoPedidos, setSemeandoPedidos] = useState(false);
+  const [removendoTeste, setRemovendoTeste] = useState(false);
   const [gerandoBackup, setGerandoBackup] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
   const [verificando, setVerificando] = useState(false);
@@ -55,6 +58,27 @@ export function ConfigPage() {
     }
   }
 
+  async function removerDadosTeste() {
+    const ok = await confirmar({
+      mensagem:
+        "Remove todos os clientes e pedidos marcados como teste (criados pelos botões acima). Clientes e pedidos reais não são afetados. Continuar?",
+      textoConfirmar: "Remover",
+      perigo: true,
+    });
+    if (!ok) return;
+    setRemovendoTeste(true);
+    try {
+      const resultado = await repo.removerDadosTeste();
+      toast.sucesso(
+        `${resultado.clientes} cliente(s) e ${resultado.pedidos} pedido(s) de teste removidos.`,
+      );
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível remover os dados de teste."));
+    } finally {
+      setRemovendoTeste(false);
+    }
+  }
+
   async function baixarBackup() {
     setGerandoBackup(true);
     try {
@@ -72,13 +96,13 @@ export function ConfigPage() {
 
   async function restaurarDeArquivo(arquivo: File | undefined) {
     if (!arquivo) return;
-    if (
-      !window.confirm(
+    const ok = await confirmar({
+      mensagem:
         "Restaurar este backup substitui TODOS os clientes, produtos e pedidos deste aparelho pelo conteúdo do arquivo. Continuar?",
-      )
-    ) {
-      return;
-    }
+      textoConfirmar: "Restaurar",
+      perigo: true,
+    });
+    if (!ok) return;
     setRestaurando(true);
     try {
       const texto = await arquivo.text();
@@ -177,21 +201,29 @@ export function ConfigPage() {
         {restaurando ? "Restaurando…" : "Restaurar backup"}
       </Button>
 
-      <h2 className="secao-titulo">Testes</h2>
+      <h2 className="secao-titulo">Dados de teste</h2>
       <p className="texto-suave">
         Cria 2 clientes de exemplo (“(teste)” no nome) para experimentar o app sem
-        digitar dados. Depois, abra o cliente em Clientes e toque em “Excluir
-        cliente” para remover.
+        digitar dados.
       </p>
       <Button variante="secundario" onClick={criarClientesTeste} disabled={semeando}>
         {semeando ? "Criando…" : "Criar clientes de teste"}
       </Button>
       <p className="texto-suave">
         Cria pedidos de exemplo espalhados em semanas/meses diferentes, com
-        marcas e clientes variados — só para validar a tela de Relatórios.
+        marcas variadas, vinculados só aos clientes de teste acima — só para
+        validar a tela de Relatórios. Marcados como teste, então nunca entram
+        nos totais de vendas.
       </p>
       <Button variante="secundario" onClick={criarPedidosTeste} disabled={semeandoPedidos}>
         {semeandoPedidos ? "Criando…" : "Criar pedidos de teste"}
+      </Button>
+      <p className="texto-suave">
+        Remove de uma vez todos os clientes e pedidos criados pelos dois
+        botões acima. Não afeta clientes/pedidos reais.
+      </p>
+      <Button variante="perigo" onClick={removerDadosTeste} disabled={removendoTeste}>
+        {removendoTeste ? "Removendo…" : "Remover dados de teste"}
       </Button>
     </Tela>
   );

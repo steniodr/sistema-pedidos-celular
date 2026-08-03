@@ -5,7 +5,7 @@ import { useDados } from "../../hooks/useDados";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Button, LinkButton } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Field";
-import { BarraInferior, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { BarraInferior, Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { formatarMoeda } from "../../domain/calculos";
 import { AvisoBase } from "./AvisoBase";
 import { avaliarBase, formatarDataHora } from "./statusBase";
@@ -61,26 +61,28 @@ export function ProdutosPage() {
           descricao="Importe a planilha de preços ou cadastre um produto."
         />
       ) : (
-        <div>
+        <div className="pilha">
           {produtos?.map((produto) => (
-            <div key={produto.id} className={css.listaProduto}>
-              <div className={css.listaProdutoInfo}>
-                <div>
-                  {produto.nome}
-                  {produto.detalhes ? ` (${produto.detalhes})` : ""}
+            <Cartao key={produto.id}>
+              <div className={css.listaProduto}>
+                <div className={css.listaProdutoInfo}>
+                  <div>
+                    {produto.nome}
+                    {produto.detalhes ? ` (${produto.detalhes})` : ""}
+                  </div>
+                  <div className="texto-suave">{produto.embalagem}</div>
                 </div>
-                <div className="texto-suave">{produto.embalagem}</div>
+                <span className="texto-forte">{formatarMoeda(produto.valorUnit)}</span>
+                <Button
+                  variante="fantasma"
+                  className={css.botaoEditarProduto}
+                  aria-label={`Editar ${produto.nome}`}
+                  onClick={() => navigate(`/produtos/${produto.id}`)}
+                >
+                  ✎
+                </Button>
               </div>
-              <span className="texto-forte">{formatarMoeda(produto.valorUnit)}</span>
-              <Button
-                variante="fantasma"
-                className={css.botaoEditarProduto}
-                aria-label={`Editar ${produto.nome}`}
-                onClick={() => navigate(`/produtos/${produto.id}`)}
-              >
-                ✎
-              </Button>
-            </div>
+            </Cartao>
           ))}
         </div>
       )}

@@ -16,6 +16,7 @@ import type {
   FiltroPedidos,
   ImportacaoClientesInfo,
   NovoPedido,
+  RemocaoDadosTeste,
   Repository,
 } from "./repository";
 
@@ -341,5 +342,18 @@ export const dexieRepository: Repository = {
         await db.meta.put({ chave: CHAVE_IMPORTACAO, valor: dados.ultimaImportacao });
       }
     });
+  },
+
+  async removerDadosTeste() {
+    const resultado: RemocaoDadosTeste = { clientes: 0, pedidos: 0 };
+    await db.transaction("rw", db.clientes, db.pedidos, async () => {
+      const clientesTeste = await db.clientes.filter((c) => c.teste === true).primaryKeys();
+      const pedidosTeste = await db.pedidos.filter((p) => p.teste === true).primaryKeys();
+      await db.clientes.bulkDelete(clientesTeste);
+      await db.pedidos.bulkDelete(pedidosTeste);
+      resultado.clientes = clientesTeste.length;
+      resultado.pedidos = pedidosTeste.length;
+    });
+    return resultado;
   },
 };

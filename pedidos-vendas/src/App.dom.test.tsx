@@ -1,9 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { App } from "./App";
 import { RepositoryProvider } from "./data/RepositoryContext";
+import { ConfirmProvider } from "./components/ui/Confirm";
 import { ToastProvider } from "./components/ui/Toast";
 import { dexieRepository } from "./data/dexieRepository";
 import { db } from "./db/schema";
@@ -18,7 +19,9 @@ function abrir(rota = "/") {
     <MemoryRouter initialEntries={[rota]}>
       <RepositoryProvider>
         <ToastProvider>
-          <App />
+          <ConfirmProvider>
+            <App />
+          </ConfirmProvider>
         </ToastProvider>
       </RepositoryProvider>
     </MemoryRouter>,
@@ -266,16 +269,17 @@ describe("fluxo do pedido", () => {
       ],
     });
 
-    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
     abrir(`/pedidos/${pedido.id}/finalizar`);
     const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
     await userEvent.click(botaoExcel);
 
+    // Sheet de confirmação (base crítica) aparece — cancela.
+    await screen.findByText(/Os preços deste pedido podem estar desatualizados/);
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
     // Cancelou a confirmação: não deve exportar nem marcar como enviado.
-    expect(confirmar).toHaveBeenCalled();
     const aindaRascunho = await dexieRepository.obterPedido(pedido.id);
     expect(aindaRascunho?.status).toBe("rascunho");
-    confirmar.mockRestore();
   });
 });
 
@@ -294,9 +298,11 @@ describe("histórico", () => {
     abrir("/pedidos");
     expect(await screen.findByText("Pedido nº 1")).toBeDefined();
 
+    await userEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
     await userEvent.click(screen.getByRole("button", { name: "Rascunhos" }));
     expect(await screen.findByText("Nenhum pedido neste filtro")).toBeDefined();
 
+    await userEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
     await userEvent.click(screen.getByRole("button", { name: "Todos" }));
     const cartao = (await screen.findByText("Pedido nº 1")).closest("div")!;
     await userEvent.click(within(cartao.parentElement!).getByRole("button", { name: "Duplicar" }));
@@ -309,6 +315,45 @@ describe("histórico", () => {
   });
 });
 
+describe("relatórios", () => {
+  it("não conta pedidos marcados como teste nos totais de vendas", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    const pedidoReal = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedidoReal,
+      status: "enviado",
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+    });
+
+    const clienteTeste = await dexieRepository.salvarCliente({
+      nome: "Cliente (teste)",
+      cpfCnpj: "11222333000181",
+      teste: true,
+    });
+    const pedidoTeste = await dexieRepository.criarPedido({
+      clienteId: clienteTeste.id,
+      marca: "MERKO",
+    });
+    await dexieRepository.salvarPedido({
+      ...pedidoTeste,
+      status: "enviado",
+      teste: true,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Tambor", descricaoProduto: "Verniz", valorUnit: 5000 },
+      ],
+    });
+
+    abrir("/relatorios");
+    const totalVendidoRotulo = await screen.findByText("Total vendido");
+    expect(within(totalVendidoRotulo.parentElement!).getByText("R$ 100,00")).toBeDefined();
+    expect(screen.queryByText("R$ 5.100,00")).toBeNull();
+    expect(screen.queryByText(/Verniz/)).toBeNull();
+  });
+});
+
 describe("clientes de teste", () => {
   it("cria pelo botão em Configurações e depois exclui pela tela do cliente", async () => {
     abrir("/config");
@@ -318,17 +363,16 @@ describe("clientes de teste", () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(2);
     });
 
-    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     const [primeiro] = await dexieRepository.listarClientes();
 
     abrir(`/clientes/${primeiro.id}`);
     await userEvent.click(await screen.findByRole("button", { name: "Excluir cliente" }));
+    await screen.findByText(/Esta ação não pode ser desfeita/);
+    await userEvent.click(screen.getByRole("button", { name: "Excluir" }));
 
     await waitFor(async () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(1);
     });
-    expect(confirmar).toHaveBeenCalled();
-    confirmar.mockRestore();
   });
 
   it("avisa quantos pedidos ficam sem cliente ao excluir, e o Desfazer restaura", async () => {
@@ -338,15 +382,14 @@ describe("clientes de teste", () => {
     });
     await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
 
-    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     abrir(`/clientes/${cliente.id}`);
     await userEvent.click(await screen.findByRole("button", { name: "Excluir cliente" }));
+    await screen.findByText(/1 pedido\(s\) registrado\(s\)/);
+    await userEvent.click(screen.getByRole("button", { name: "Excluir" }));
 
     await waitFor(async () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(0);
     });
-    expect(confirmar.mock.calls[0][0]).toMatch(/1 pedido\(s\) registrado\(s\)/);
-    confirmar.mockRestore();
 
     await userEvent.click(await screen.findByRole("button", { name: "Desfazer" }));
     await waitFor(async () => {

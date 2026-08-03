@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.0";
+export const VERSAO_APP = "1.1";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,17 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.1",
+    data: "2026-08-03",
+    itens: [
+      "Dados de teste (Configurações) ficam marcados e nunca mais entram nos totais de Relatórios — e agora dá para removê-los todos de uma vez",
+      "Excluir cliente/produto/pedido, restaurar backup e o aviso de base de preços crítica usam o visual do próprio app, em vez do alerta do navegador",
+      "Histórico: filtro por período com calendário (dia, semana ou mês) e os demais filtros agrupados num painel, com contador de filtros ativos",
+      "Finalizar pedido: Exportar Excel/PDF fica fixo na parte de baixo da tela",
+      "Importar clientes/produtos: mapeamento de colunas some quando a planilha é reconhecida automaticamente (só aparece se precisar ajustar)",
+    ],
+  },
   {
     versao: "1.0",
     data: "2026-08-03",

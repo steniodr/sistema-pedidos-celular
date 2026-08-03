@@ -62,7 +62,9 @@ const PEDIDOS_TESTE: PedidoTeste[] = [
 /** Garante clientes de teste e cria os pedidos acima. Devolve quantos pedidos foram criados. */
 export async function gerarPedidosTeste(repo: Repository): Promise<number> {
   await semearClientesTeste(repo);
-  const clientes = await repo.listarClientes();
+  // Só clientes de teste — nunca vincula um pedido fictício a um cliente real
+  // (senão o pedido de teste também aparece misturado no histórico dele).
+  const clientes = (await repo.listarClientes()).filter((c) => c.teste);
   if (clientes.length === 0) return 0;
 
   let criados = 0;
@@ -80,6 +82,7 @@ export async function gerarPedidosTeste(repo: Repository): Promise<number> {
       descontoTipo: "percentual",
       descontoValor: 0,
       status: base.status,
+      teste: true,
       criadoEm: momento,
       atualizadoEm: momento,
     };

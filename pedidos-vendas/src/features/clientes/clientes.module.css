@@ -62,3 +62,22 @@
   background: var(--cor-alerta-fundo);
   color: var(--cor-alerta);
 }
+
+.detalhesAviso {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  padding: 12px 14px;
+  font-size: 0.9375rem;
+}
+
+.detalhesAviso summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.detalhesAviso ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}

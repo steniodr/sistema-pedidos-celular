@@ -38,10 +38,13 @@ export function RelatoriosPage() {
   const [rotuloOrdem, setRotuloOrdem] = useState<RotuloOrdem>("Maior valor");
 
   const { dados: contexto } = useDados(async () => {
-    const [enviados, clientes] = await Promise.all([
+    const [enviadosBrutos, clientes] = await Promise.all([
       repo.listarPedidos({ status: "enviado" }),
       repo.listarClientes(),
     ]);
+    // Pedidos gerados em Configurações → "Criar pedidos de teste" não são vendas
+    // reais — nunca entram nos números de Relatórios.
+    const enviados = enviadosBrutos.filter((p) => !p.teste);
     const nomePorClienteId = new Map(clientes.map((c) => [c.id, c.nome]));
     const marcas = [...new Set(enviados.map((p) => p.marca).filter(Boolean))];
     const clientesComPedido = [...new Set(enviados.map((p) => p.clienteId))]

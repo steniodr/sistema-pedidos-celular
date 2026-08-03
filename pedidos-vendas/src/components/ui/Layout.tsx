@@ -7,6 +7,7 @@ export function Tela({
   voltar,
   acao,
   comBarraInferior,
+  barraInferiorAlta,
   children,
 }: {
   titulo: string;
@@ -14,11 +15,17 @@ export function Tela({
   voltar?: string | true;
   acao?: ReactNode;
   comBarraInferior?: boolean;
+  /** Reserva mais espaço embaixo — para uma `BarraInferior` com dois botões empilhados. */
+  barraInferiorAlta?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
 
-  const classeBarra = comBarraInferior ? " app-conteudo--com-barra" : "";
+  const classeBarra = comBarraInferior
+    ? barraInferiorAlta
+      ? " app-conteudo--com-barra-alta"
+      : " app-conteudo--com-barra"
+    : "";
 
   return (
     <div className="app-shell">

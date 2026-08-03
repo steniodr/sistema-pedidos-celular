@@ -19,6 +19,7 @@ const CLIENTES_TESTE: EntradaCliente[] = [
     transportadora: "Rodoviário Sul",
     condicaoPagamento: "28/35/42 dias",
     obsGerais: "Depósito central",
+    teste: true,
   },
   {
     nome: "Tintas do Vale Ltda (teste)",
@@ -32,6 +33,7 @@ const CLIENTES_TESTE: EntradaCliente[] = [
     transportadora: "FOB - Transportadora",
     condicaoPagamento: "A combinar",
     obsGerais: "Loja",
+    teste: true,
   },
 ];
 

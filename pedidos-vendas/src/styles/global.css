@@ -103,6 +103,11 @@ a {
   padding-bottom: calc(96px + var(--espaco-base));
 }
 
+/* Barra inferior com duas linhas de botão (ex.: Exportar Excel + PDF empilhados). */
+.app-conteudo--com-barra-alta {
+  padding-bottom: calc(150px + var(--espaco-base));
+}
+
 .pilha {
   display: flex;
   flex-direction: column;

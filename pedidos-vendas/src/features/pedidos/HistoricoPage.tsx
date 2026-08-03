@@ -4,6 +4,7 @@ import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Button } from "../../components/ui/Button";
+import { CalendarioMes } from "../../components/ui/CalendarioMes";
 import { Input, Select } from "../../components/ui/Field";
 import { BarraInferior, Cartao, Chips, EstadoVazio, Sheet, Tela } from "../../components/ui/Layout";
 import { StatusPedido as StatusPedidoTag } from "../../components/ui/StatusPedido";
@@ -13,6 +14,13 @@ import { mensagemErro } from "../../domain/erros";
 import { baixarArquivo } from "../export/dadosExportacao";
 import { formatarData } from "../produtos/statusBase";
 import { gerarPdfHistorico, montarLinhasHistorico, montarTextoHistorico } from "./exportarHistorico";
+import {
+  dataLocalDoISO,
+  intervaloFiltroPeriodo,
+  rotuloFiltroPeriodo,
+  type FiltroPeriodo,
+  type TipoPeriodo,
+} from "./filtroPeriodoHistorico";
 import type { Cliente, StatusPedido } from "../../domain/types";
 import css from "./pedidos.module.css";
 
@@ -23,6 +31,13 @@ const TODOS_CLIENTES = "";
 
 const ORDENS = ["Recentes", "Maior valor"] as const;
 type Ordem = (typeof ORDENS)[number];
+
+const TIPOS_PERIODO = ["dia", "semana", "mes"] as const satisfies readonly TipoPeriodo[];
+const ROTULOS_TIPO_PERIODO: Record<TipoPeriodo, string> = {
+  dia: "Dia",
+  semana: "Semana",
+  mes: "Mês",
+};
 
 const STATUS_POR_FILTRO: Record<Filtro, StatusPedido | undefined> = {
   Todos: undefined,
@@ -37,7 +52,11 @@ export function HistoricoPage() {
   const [filtro, setFiltro] = useState<Filtro>("Todos");
   const [marcaFiltro, setMarcaFiltro] = useState(TODAS_MARCAS);
   const [clienteFiltro, setClienteFiltro] = useState(TODOS_CLIENTES);
-  const [diaFiltro, setDiaFiltro] = useState("");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<FiltroPeriodo | null>(null);
+  const [sheetFiltrosAberto, setSheetFiltrosAberto] = useState(false);
+  const [sheetPeriodoAberto, setSheetPeriodoAberto] = useState(false);
+  const [tipoPeriodo, setTipoPeriodo] = useState<TipoPeriodo>("dia");
+  const [mesCalendario, setMesCalendario] = useState(() => new Date());
   const [ordem, setOrdem] = useState<Ordem>("Recentes");
   const [busca, setBusca] = useState("");
   const buscaDebounced = useDebounce(busca);
@@ -69,14 +88,37 @@ export function HistoricoPage() {
     [repo, filtro, marcaFiltro, clienteFiltro, buscaDebounced],
   );
 
+  const diasComDados = useMemo(
+    () => new Set((pedidosBrutos ?? []).map((p) => p.dataPedido)),
+    [pedidosBrutos],
+  );
+
   const pedidos = useMemo(() => {
     if (!pedidosBrutos) return pedidosBrutos;
-    const filtrados = diaFiltro
-      ? pedidosBrutos.filter((p) => p.dataPedido === diaFiltro)
-      : pedidosBrutos;
+    let filtrados = pedidosBrutos;
+    if (filtroPeriodo) {
+      const { inicio, fim } = intervaloFiltroPeriodo(filtroPeriodo);
+      filtrados = filtrados.filter((p) => p.dataPedido >= inicio && p.dataPedido <= fim);
+    }
     if (ordem === "Recentes") return filtrados;
     return [...filtrados].sort((a, b) => totaisPedido(b).total - totaisPedido(a).total);
-  }, [pedidosBrutos, diaFiltro, ordem]);
+  }, [pedidosBrutos, filtroPeriodo, ordem]);
+
+  function abrirSheetPeriodo() {
+    if (filtroPeriodo) {
+      setTipoPeriodo(filtroPeriodo.tipo);
+      setMesCalendario(dataLocalDoISO(filtroPeriodo.referencia));
+    }
+    setSheetFiltrosAberto(false);
+    setSheetPeriodoAberto(true);
+  }
+
+  function limparFiltros() {
+    setFiltro("Todos");
+    setMarcaFiltro(TODAS_MARCAS);
+    setClienteFiltro(TODOS_CLIENTES);
+    setFiltroPeriodo(null);
+  }
 
   async function duplicar(id: string) {
     try {
@@ -90,9 +132,10 @@ export function HistoricoPage() {
   }
 
   function tituloExportacao(): string {
-    if (filtro === "Enviados") return "Histórico — pedidos enviados";
-    if (filtro === "Rascunhos") return "Histórico — rascunhos";
-    return "Histórico — todos os pedidos";
+    const status =
+      filtro === "Enviados" ? "pedidos enviados" : filtro === "Rascunhos" ? "rascunhos" : "todos os pedidos";
+    const periodo = filtroPeriodo ? ` (${rotuloFiltroPeriodo(filtroPeriodo)})` : "";
+    return `Histórico — ${status}${periodo}`;
   }
 
   function linhas(clientesPorId: Map<string, Cliente>) {
@@ -156,40 +199,15 @@ export function HistoricoPage() {
 
   const opcoesMarca = [TODAS_MARCAS, ...(contexto?.marcas ?? [])];
 
+  const filtrosAtivos = [
+    filtro !== "Todos",
+    marcaFiltro !== TODAS_MARCAS,
+    clienteFiltro !== TODOS_CLIENTES,
+    filtroPeriodo !== null,
+  ].filter(Boolean).length;
+
   return (
     <Tela titulo="Histórico" voltar="/" comBarraInferior>
-      <div className={css.filtros}>
-        <Chips opcoes={FILTROS} valor={filtro} onChange={setFiltro} />
-      </div>
-
-      {opcoesMarca.length > 1 && (
-        <div className={css.filtros}>
-          <Chips opcoes={opcoesMarca} valor={marcaFiltro} onChange={setMarcaFiltro} />
-        </div>
-      )}
-
-      {contexto && contexto.clientesComPedido.length > 1 && (
-        <Select
-          rotulo="Cliente"
-          value={clienteFiltro}
-          onChange={(e) => setClienteFiltro(e.target.value)}
-        >
-          <option value={TODOS_CLIENTES}>Todos os clientes</option>
-          {contexto.clientesComPedido.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome}
-            </option>
-          ))}
-        </Select>
-      )}
-
-      <Input
-        rotulo="Dia"
-        type="date"
-        value={diaFiltro}
-        onChange={(e) => setDiaFiltro(e.target.value)}
-      />
-
       <Input
         rotulo="Buscar"
         placeholder="Número do pedido, marca ou cliente"
@@ -198,11 +216,15 @@ export function HistoricoPage() {
         autoComplete="off"
       />
 
-      {pedidos && pedidos.length > 1 && (
-        <div className={css.filtros}>
-          <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />
-        </div>
-      )}
+      <Button
+        variante="secundario"
+        bloco
+        className={css.botaoFiltros}
+        onClick={() => setSheetFiltrosAberto(true)}
+      >
+        Filtros
+        {filtrosAtivos > 0 && <span className={css.badgeFiltros}>{filtrosAtivos}</span>}
+      </Button>
 
       {pedidos?.length === 0 ? (
         <EstadoVazio titulo="Nenhum pedido neste filtro" />
@@ -220,6 +242,7 @@ export function HistoricoPage() {
                   {contexto?.clientesPorId.get(pedido.clienteId)?.nome ?? "Cliente removido"} ·{" "}
                   {pedido.marca || "Sem marca"} · {formatarData(pedido.dataPedido)} ·{" "}
                   <StatusPedidoTag status={pedido.status} />
+                  {pedido.teste && <span className={css.tagTeste}>Teste</span>}
                 </div>
                 <div className={css.acoesItem}>
                   <Button variante="fantasma" onClick={() => duplicar(pedido.id)}>
@@ -249,6 +272,85 @@ export function HistoricoPage() {
           Exportar
         </Button>
       </BarraInferior>
+
+      <Sheet
+        titulo="Filtros"
+        aberto={sheetFiltrosAberto}
+        aoFechar={() => setSheetFiltrosAberto(false)}
+      >
+        <Chips opcoes={FILTROS} valor={filtro} onChange={setFiltro} />
+
+        {opcoesMarca.length > 1 && (
+          <Chips opcoes={opcoesMarca} valor={marcaFiltro} onChange={setMarcaFiltro} />
+        )}
+
+        {contexto && contexto.clientesComPedido.length > 1 && (
+          <Select
+            rotulo="Cliente"
+            value={clienteFiltro}
+            onChange={(e) => setClienteFiltro(e.target.value)}
+          >
+            <option value={TODOS_CLIENTES}>Todos os clientes</option>
+            {contexto.clientesComPedido.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </Select>
+        )}
+
+        <Button variante="secundario" bloco onClick={abrirSheetPeriodo}>
+          {filtroPeriodo ? rotuloFiltroPeriodo(filtroPeriodo) : "Filtrar por período"}
+        </Button>
+
+        {pedidos && pedidos.length > 1 && (
+          <>
+            <span className="secao-titulo">Ordenar</span>
+            <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />
+          </>
+        )}
+
+        {filtrosAtivos > 0 && (
+          <Button variante="fantasma" bloco onClick={limparFiltros}>
+            Limpar filtros
+          </Button>
+        )}
+      </Sheet>
+
+      <Sheet
+        titulo="Filtrar por período"
+        aberto={sheetPeriodoAberto}
+        aoFechar={() => setSheetPeriodoAberto(false)}
+      >
+        <Chips
+          opcoes={TIPOS_PERIODO}
+          valor={tipoPeriodo}
+          onChange={setTipoPeriodo}
+          rotulos={ROTULOS_TIPO_PERIODO}
+        />
+        <CalendarioMes
+          mesExibido={mesCalendario}
+          diasComDados={diasComDados}
+          intervaloSelecionado={filtroPeriodo ? intervaloFiltroPeriodo(filtroPeriodo) : null}
+          onSelecionarDia={(dia) => {
+            setFiltroPeriodo({ tipo: tipoPeriodo, referencia: dia });
+            setSheetPeriodoAberto(false);
+          }}
+          onMudarMes={setMesCalendario}
+        />
+        {filtroPeriodo && (
+          <Button
+            variante="fantasma"
+            bloco
+            onClick={() => {
+              setFiltroPeriodo(null);
+              setSheetPeriodoAberto(false);
+            }}
+          >
+            Limpar filtro de período
+          </Button>
+        )}
+      </Sheet>
 
       <Sheet
         titulo="Exportar histórico"

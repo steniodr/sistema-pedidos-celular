@@ -133,7 +133,8 @@ extensa de ajustes pedidos após uso real do app:
 **Clientes** — cadastro com validação de CPF/CNPJ (bloqueia finalizar pedido, não
 bloqueia rascunho), condição de pagamento como lista fixa (42 opções) com opção
 "Outro", lista com ícone de edição, busca com debounce, ordenação (Nome/Recentes),
-clientes de teste (Configurações), **importação em lote por planilha** (upsert
+clientes de teste (Configurações, marcados e removíveis de uma vez, ver
+"Backup" abaixo), **importação em lote por planilha** (upsert
 por CPF/CNPJ, ver seção acima), tag de situação (Ativo/Inativo/Atenção) na lista
 quando vem da planilha, campos `nomeFantasia` e `contato` no cadastro. Excluir
 avisa quantos pedidos ficam sem o nome do cliente antes de confirmar, e oferece
@@ -150,9 +151,15 @@ Finalizar), busca de produto só por nome (com escolha de variante quando há
 mais de uma), embalagem em chips com opção "Outro", embalagem e valor
 obrigatórios, quantidade com botões −/+, desconto em % ou R$ com motivo
 opcional, forma de solicitação como lista fixa, excluir pedido (com
-"Desfazer"), histórico com filtro por marca/cliente/status, busca com
-debounce, ordenação (Recentes/Maior valor), duplicar e reenviar pedido,
-botões "Salvar rascunho" e "Voltar ao início".
+"Desfazer"), histórico com filtro por marca/cliente/status e por período
+(dia, semana ou mês, com calendário) agrupados num painel "Filtros" com
+contador de filtros ativos, busca com debounce, ordenação (Recentes/Maior
+valor), duplicar e reenviar pedido, botões "Salvar rascunho" e "Voltar ao
+início". Finalizar pedido tem os botões de exportar Excel/PDF fixos na
+parte de baixo da tela. Excluir cliente/produto/pedido, restaurar backup e
+o aviso de base de preços crítica usam um diálogo de confirmação no próprio
+visual do app (`useConfirm`, `src/components/ui/Confirm.tsx`), não mais o
+alerta nativo do navegador.
 
 **Exportação** — Excel no molde oficial (com fallback e adaptação automática de
 capacidade, ver acima) e PDF com bloco de cliente e bloco de totais estilizados
@@ -165,17 +172,21 @@ de incluir todos os pedidos ou só os enviados (`src/features/pedidos/exportarHi
 ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
 ticket médio; lista de produtos mais vendidos com toggle Maior/Menor valor
 (barras simples, sem lib de gráfico — ver `src/domain/relatorios.ts`). Só
-conta pedidos com status "Enviado" (rascunho não é venda fechada) e só
-reflete os pedidos deste aparelho, já que a sincronização entre vendedores
-ainda não existe.
+conta pedidos com status "Enviado" (rascunho não é venda fechada), nunca
+conta os pedidos de teste (ver "Backup" abaixo) e só reflete os pedidos
+deste aparelho, já que a sincronização entre vendedores ainda não existe.
 
 **Backup** — Configurações tem botões para baixar toda a base local (clientes,
 produtos, pedidos, representante) em um `.json`, e restaurar a partir de um
 arquivo desses — útil pra trocar de aparelho antes da sincronização em nuvem
-existir. Configurações também tem um gerador de pedidos de teste (datas/marcas/
-clientes variados) só pra validar a tela de Relatórios sem montar pedido na mão.
+existir. Configurações também tem um gerador de pedidos de teste (datas/marcas
+variadas, vinculados só aos clientes de teste) só pra validar a tela de
+Relatórios sem montar pedido na mão. Clientes e pedidos de teste ficam
+marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
+de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
+teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.0`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.1`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -183,7 +194,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-128 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
+138 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
 molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

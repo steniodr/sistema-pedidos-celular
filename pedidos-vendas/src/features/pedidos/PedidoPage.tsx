@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { Button } from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/Confirm";
 import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido, totalItem } from "../../domain/calculos";
@@ -14,10 +15,17 @@ export function PedidoPage() {
   const navigate = useNavigate();
   const repo = useRepository();
   const toast = useToast();
+  const confirmar = useConfirm();
   const { pedido, cliente, carregando, atualizar } = usePedido(id);
   const [excluindo, setExcluindo] = useState(false);
 
-  if (carregando) return <Tela titulo="Pedido" voltar="/">{null}</Tela>;
+  if (carregando) {
+    return (
+      <Tela titulo="Pedido" voltar="/">
+        <p className="texto-suave">Carregando…</p>
+      </Tela>
+    );
+  }
   if (!pedido) {
     return (
       <Tela titulo="Pedido" voltar="/">
@@ -38,9 +46,12 @@ export function PedidoPage() {
 
   async function excluirPedido() {
     if (!pedido) return;
-    if (!window.confirm(`Excluir o pedido nº ${pedido.numero}? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+    const ok = await confirmar({
+      mensagem: `Excluir o pedido nº ${pedido.numero}? Esta ação não pode ser desfeita.`,
+      textoConfirmar: "Excluir",
+      perigo: true,
+    });
+    if (!ok) return;
     setExcluindo(true);
     try {
       await repo.removerPedido(pedido.id);

@@ -112,6 +112,27 @@ describe("dexieRepository — backup e restaurar*", () => {
     expect(clientes.map((c) => c.nome)).toEqual(["Restaurado"]);
   });
 
+  it("removerDadosTeste apaga só clientes/pedidos marcados como teste", async () => {
+    const real = await dexieRepository.salvarCliente({ nome: "Cliente Real", cpfCnpj: CPF_VALIDO });
+    const teste = await dexieRepository.salvarCliente({
+      nome: "Cliente (teste)",
+      cpfCnpj: CNPJ_VALIDO,
+      teste: true,
+    });
+    await dexieRepository.criarPedido({ clienteId: real.id, marca: "MERKO" });
+    const pedidoTeste = await dexieRepository.criarPedido({ clienteId: teste.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({ ...pedidoTeste, teste: true });
+
+    const resultado = await dexieRepository.removerDadosTeste();
+    expect(resultado).toEqual({ clientes: 1, pedidos: 1 });
+
+    const clientesRestantes = await db.clientes.toArray();
+    expect(clientesRestantes.map((c) => c.nome)).toEqual(["Cliente Real"]);
+    const pedidosRestantes = await db.pedidos.toArray();
+    expect(pedidosRestantes).toHaveLength(1);
+    expect(pedidosRestantes[0].clienteId).toBe(real.id);
+  });
+
   it("restaurarCliente/restaurarProduto recolocam o registro exatamente como estava", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Original",

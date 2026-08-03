@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/Confirm";
 import { Input, Textarea } from "../../components/ui/Field";
 import { SelectComOutro } from "../../components/ui/SelectComOutro";
 import { BarraInferior, Tela } from "../../components/ui/Layout";
@@ -37,6 +38,7 @@ export function ClienteFormPage() {
   const repo = useRepository();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirmar = useConfirm();
   const { id } = useParams();
   const [params] = useSearchParams();
 
@@ -108,7 +110,7 @@ export function ClienteFormPage() {
       vinculados.length > 0
         ? `Este cliente tem ${vinculados.length} pedido(s) registrado(s). Os pedidos continuam existindo, mas o nome do cliente some deles. Excluir mesmo assim?`
         : `Excluir o cliente "${cliente.nome}"? Esta ação não pode ser desfeita.`;
-    if (!window.confirm(aviso)) return;
+    if (!(await confirmar({ mensagem: aviso, textoConfirmar: "Excluir", perigo: true }))) return;
 
     setExcluindo(true);
     try {

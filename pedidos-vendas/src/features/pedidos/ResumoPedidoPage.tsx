@@ -23,7 +23,13 @@ export function ResumoPedidoPage() {
     if (pedido) setDescontoTexto(pedido.descontoValor ? String(pedido.descontoValor).replace(".", ",") : "");
   }, [pedido?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (carregando) return <Tela titulo="Resumo" voltar={true}>{null}</Tela>;
+  if (carregando) {
+    return (
+      <Tela titulo="Resumo" voltar={true}>
+        <p className="texto-suave">Carregando…</p>
+      </Tela>
+    );
+  }
   if (!pedido) {
     return (
       <Tela titulo="Resumo" voltar="/">

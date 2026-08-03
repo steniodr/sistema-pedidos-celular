@@ -34,6 +34,7 @@ export function ImportarProdutosPage() {
   const [planilha, setPlanilha] = useState<PlanilhaLida | null>(null);
   const [mapeamentoLista, setMapeamentoLista] = useState<MapeamentoLista | null>(null);
   const [colunasMatriz, setColunasMatriz] = useState<ColunasMatriz | null>(null);
+  const [colunasAbertas, setColunasAbertas] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
@@ -53,7 +54,9 @@ export function ImportarProdutosPage() {
       setMapeamentoLista(lida.mapeamentoLista);
       setColunasMatriz(lida.colunasMatriz);
       setNomeArquivo(arquivo.name);
-      if (lida.linhaCabecalho === -1) {
+      const cabecalhoNaoIdentificado = lida.linhaCabecalho === -1;
+      setColunasAbertas(cabecalhoNaoIdentificado);
+      if (cabecalhoNaoIdentificado) {
         toast.info("Não identifiquei o cabeçalho. Confira as colunas abaixo.");
       }
     } catch (e) {
@@ -118,78 +121,96 @@ export function ImportarProdutosPage() {
 
       {planilha && planilha.formato === "matriz" && colunasMatriz && (
         <>
-          <h2 className="secao-titulo">Colunas identificadas</h2>
+          <div className="linha linha--entre">
+            <h2 className="secao-titulo">Colunas identificadas</h2>
+            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
+              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
+            </Button>
+          </div>
           <p className="texto-suave">
             Formato de tabela de preços: uma linha por produto, uma coluna por
             embalagem. {colunasMatriz.embalagens.length} colunas de embalagem
             encontradas.
           </p>
-          <Select
-            rotulo="Produto"
-            obrigatorio
-            value={colunasMatriz.produto ?? ""}
-            onChange={(e) => ajustarColunaMatriz("produto", e.target.value)}
-          >
-            <option value="">— não usar —</option>
-            {colunas.map((nome, indice) => (
-              <option key={indice} value={indice}>
-                {nome || `Coluna ${indice + 1}`}
-              </option>
-            ))}
-          </Select>
-          <Select
-            rotulo="Detalhes / variação"
-            ajuda="Combinado com o nome do produto (ex.: “Esmalte brilhante (branco)”)."
-            value={colunasMatriz.detalhes ?? ""}
-            onChange={(e) => ajustarColunaMatriz("detalhes", e.target.value)}
-          >
-            <option value="">— não usar —</option>
-            {colunas.map((nome, indice) => (
-              <option key={indice} value={indice}>
-                {nome || `Coluna ${indice + 1}`}
-              </option>
-            ))}
-          </Select>
-          <Select
-            rotulo="Categoria"
-            ajuda="Usada só para identificar a coluna; não afeta o produto importado."
-            value={colunasMatriz.categoria ?? ""}
-            onChange={(e) => ajustarColunaMatriz("categoria", e.target.value)}
-          >
-            <option value="">— não usar —</option>
-            {colunas.map((nome, indice) => (
-              <option key={indice} value={indice}>
-                {nome || `Coluna ${indice + 1}`}
-              </option>
-            ))}
-          </Select>
+          {colunasAbertas && (
+            <>
+              <Select
+                rotulo="Produto"
+                obrigatorio
+                value={colunasMatriz.produto ?? ""}
+                onChange={(e) => ajustarColunaMatriz("produto", e.target.value)}
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                rotulo="Detalhes / variação"
+                ajuda="Combinado com o nome do produto (ex.: “Esmalte brilhante (branco)”)."
+                value={colunasMatriz.detalhes ?? ""}
+                onChange={(e) => ajustarColunaMatriz("detalhes", e.target.value)}
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                rotulo="Categoria"
+                ajuda="Usada só para identificar a coluna; não afeta o produto importado."
+                value={colunasMatriz.categoria ?? ""}
+                onChange={(e) => ajustarColunaMatriz("categoria", e.target.value)}
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
         </>
       )}
 
       {planilha && planilha.formato === "lista" && mapeamentoLista && (
         <>
-          <h2 className="secao-titulo">Colunas</h2>
-          {(Object.keys(ROTULOS_LISTA) as CampoLista[]).map((campo) => (
-            <Select
-              key={campo}
-              rotulo={ROTULOS_LISTA[campo]}
-              value={mapeamentoLista[campo] ?? ""}
-              obrigatorio={campo !== "embalagem"}
-              onChange={(e) =>
-                setMapeamentoLista({
-                  ...mapeamentoLista,
-                  [campo]: e.target.value === "" ? null : Number(e.target.value),
-                })
-              }
-            >
-              <option value="">— não usar —</option>
-              {colunas.map((nome, indice) => (
-                <option key={indice} value={indice}>
-                  {nome || `Coluna ${indice + 1}`}
-                </option>
-              ))}
-            </Select>
-          ))}
+          <div className="linha linha--entre">
+            <h2 className="secao-titulo">Colunas</h2>
+            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
+              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
+            </Button>
+          </div>
+          {!colunasAbertas && (
+            <p className="texto-suave">Colunas identificadas automaticamente.</p>
+          )}
+          {colunasAbertas &&
+            (Object.keys(ROTULOS_LISTA) as CampoLista[]).map((campo) => (
+              <Select
+                key={campo}
+                rotulo={ROTULOS_LISTA[campo]}
+                value={mapeamentoLista[campo] ?? ""}
+                obrigatorio={campo !== "embalagem"}
+                onChange={(e) =>
+                  setMapeamentoLista({
+                    ...mapeamentoLista,
+                    [campo]: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
+            ))}
         </>
       )}
 
@@ -236,10 +257,8 @@ export function ImportarProdutosPage() {
           )}
 
           {resultado.ignorados.length > 0 && (
-            <details>
-              <summary className="texto-suave">
-                Ver linhas com aviso ({resultado.ignorados.length})
-              </summary>
+            <details className={css.detalhesAviso}>
+              <summary>Ver linhas com aviso ({resultado.ignorados.length})</summary>
               <ul className="texto-suave">
                 {resultado.ignorados.slice(0, 30).map((ig, i) => (
                   <li key={i}>

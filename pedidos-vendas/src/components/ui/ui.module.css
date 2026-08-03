@@ -308,3 +308,80 @@
   gap: 12px;
   z-index: 30;
 }
+
+/* ---------- Calendário (CalendarioMes) ---------- */
+.calendario {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendarioCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendarioNav {
+  width: var(--alvo-toque);
+  height: var(--alvo-toque);
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--cor-primaria);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.calendarioMesRotulo {
+  font-weight: 700;
+}
+
+.calendarioSemana {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  color: var(--cor-texto-suave);
+  font-size: 0.75rem;
+}
+
+.calendarioGrade {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 4px;
+}
+
+.calendarioDia {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  width: 36px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--cor-texto);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.calendarioDia--comDados::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+}
+
+.calendarioDia--selecionado {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.calendarioDia--selecionado.calendarioDia--comDados::after {
+  background: #fff;
+}

@@ -63,6 +63,14 @@ export interface Repository {
   exportarBackup(): Promise<BackupDados>;
   /** Substitui clientes, produtos, pedidos e configuração pelo conteúdo do backup. */
   restaurarBackup(dados: BackupDados): Promise<void>;
+
+  /** Apaga todos os clientes e pedidos marcados como `teste` (gerados em Configurações). */
+  removerDadosTeste(): Promise<RemocaoDadosTeste>;
+}
+
+export interface RemocaoDadosTeste {
+  clientes: number;
+  pedidos: number;
 }
 
 export type EntradaCliente = Omit<Cliente, "id" | "criadoEm" | "atualizadoEm"> & {
