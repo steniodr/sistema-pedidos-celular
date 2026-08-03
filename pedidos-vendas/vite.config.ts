@@ -7,6 +7,12 @@ export default defineConfig({
   // no celular durante o teste em campo — sem depender de passar --host toda vez.
   server: { host: true },
   preview: { host: true },
+  build: {
+    // exceljs/xlsx/jspdf (import/export) já são carregados sob demanda via
+    // import() dinâmico — o aviso de chunk grande é sobre o tamanho deles,
+    // não sobre bloquear o carregamento inicial do app.
+    chunkSizeWarningLimit: 1000,
+  },
   plugins: [
     react(),
     VitePWA({

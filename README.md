@@ -35,6 +35,11 @@ no padrão oficial da empresa, sem precisar editar nada depois.
 - **Saída pronta para envio.** Excel e PDF já saem no layout que a empresa
   usa hoje (mesmo molde para Arara Azul e Merko), com totais, desconto e
   dados do cliente calculados automaticamente.
+- **Base de clientes importável.** Uma planilha com os clientes já
+  cadastrados (nome, CPF/CNPJ, contato, endereço etc.) pode ser importada de
+  uma vez — reimportar depois só atualiza quem já existe, sem duplicar.
+- **Relatório de vendas.** Total vendido, número de pedidos, ticket médio e
+  produtos mais vendidos, filtrando por semana, mês, cliente ou marca.
 
 ## Tecnologia (resumo)
 
@@ -58,10 +63,10 @@ mesmo tempo, sem reinstalação manual.
 
 ## Estado atual do projeto
 
-O app já cobre o fluxo completo de cadastro de cliente, base de produtos,
-montagem de pedido e exportação em Excel/PDF no molde oficial, incluindo
-histórico de pedidos. Sincronização automática entre vendedores (nuvem) e
-tela de gráficos/relatórios de vendas ainda estão planejadas como próximos
-passos.
+O app já cobre o fluxo completo de cadastro de cliente (incluindo importação
+em lote), base de produtos, montagem de pedido, exportação em Excel/PDF no
+molde oficial, histórico de pedidos e relatório de vendas. A sincronização
+automática entre vendedores (nuvem) é o próximo passo planejado — hoje cada
+aparelho guarda seus próprios dados.
 
 Detalhes técnicos e de organização do código: [pedidos-vendas/README.md](pedidos-vendas/README.md).

@@ -19,13 +19,13 @@ describe("avaliarBase", () => {
     expect(avaliarBase(importacao(30), HOJE).nivel).toBe("ok");
   });
 
-  it("fica amarela entre 31 e 60 dias", () => {
+  it("fica amarela entre 31 e 90 dias", () => {
     expect(avaliarBase(importacao(31), HOJE).nivel).toBe("atencao");
-    expect(avaliarBase(importacao(60), HOJE).nivel).toBe("atencao");
+    expect(avaliarBase(importacao(90), HOJE).nivel).toBe("atencao");
   });
 
-  it("fica vermelha acima de 60 dias", () => {
-    expect(avaliarBase(importacao(61), HOJE).nivel).toBe("critico");
+  it("fica vermelha acima de 90 dias", () => {
+    expect(avaliarBase(importacao(91), HOJE).nivel).toBe("critico");
     expect(avaliarBase(importacao(200), HOJE).nivel).toBe("critico");
   });
 });

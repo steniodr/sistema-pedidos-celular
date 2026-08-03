@@ -17,6 +17,15 @@ export interface Repository {
   obterCliente(id: string): Promise<Cliente | undefined>;
   salvarCliente(cliente: EntradaCliente): Promise<Cliente>;
   removerCliente(id: string): Promise<void>;
+  /**
+   * Importa clientes em lote, casando por CPF/CNPJ (normalizado): quem já existe é
+   * atualizado (mantendo id/criadoEm), quem não existe é criado. Ao contrário de
+   * `substituirBaseProdutos`, NUNCA apaga clientes existentes — pedidos já feitos
+   * referenciam clientes por id e ficariam órfãos.
+   */
+  importarClientes(entradas: EntradaCliente[], arquivo: string): Promise<ImportacaoClientesInfo>;
+  /** Recoloca um cliente exatamente como estava — usado só pelo "Desfazer" da exclusão. */
+  restaurarCliente(cliente: Cliente): Promise<void>;
 
   // Produtos
   listarProdutos(busca?: string, limite?: number): Promise<Produto[]>;
@@ -28,6 +37,8 @@ export interface Repository {
   /** Cria ou atualiza um produto isolado (tela de edição manual). */
   salvarProduto(produto: EntradaProdutoUnico): Promise<Produto>;
   removerProduto(id: string): Promise<void>;
+  /** Recoloca um produto exatamente como estava — usado só pelo "Desfazer" da exclusão. */
+  restaurarProduto(produto: Produto): Promise<void>;
   contarProdutos(): Promise<number>;
   /** Troca a base inteira de produtos e registra a origem/data da importação. */
   substituirBaseProdutos(produtos: EntradaProduto[], arquivo: string): Promise<ImportacaoInfo>;
@@ -38,6 +49,8 @@ export interface Repository {
   obterPedido(id: string): Promise<Pedido | undefined>;
   salvarPedido(pedido: Pedido): Promise<Pedido>;
   removerPedido(id: string): Promise<void>;
+  /** Recoloca um pedido exatamente como estava — usado só pelo "Desfazer" da exclusão. */
+  restaurarPedido(pedido: Pedido): Promise<void>;
   criarPedido(dados: NovoPedido): Promise<Pedido>;
   duplicarPedido(id: string): Promise<Pedido>;
   proximoNumeroPedido(): Promise<number>;
@@ -45,11 +58,24 @@ export interface Repository {
   // Configuração
   obterRepresentante(): Promise<Representante | undefined>;
   salvarRepresentante(representante: Representante): Promise<void>;
+
+  // Backup (troca de aparelho — a sincronização entre vendedores ainda não existe)
+  exportarBackup(): Promise<BackupDados>;
+  /** Substitui clientes, produtos, pedidos e configuração pelo conteúdo do backup. */
+  restaurarBackup(dados: BackupDados): Promise<void>;
 }
 
 export type EntradaCliente = Omit<Cliente, "id" | "criadoEm" | "atualizadoEm"> & {
   id?: string;
 };
+
+export interface ImportacaoClientesInfo {
+  arquivo: string;
+  quandoEm: string;
+  totalNovos: number;
+  totalAtualizados: number;
+  totalIgnorados: number;
+}
 
 export type EntradaProduto = Pick<Produto, "nome" | "detalhes" | "embalagem" | "valorUnit">;
 
@@ -63,6 +89,18 @@ export interface NovoPedido {
 export interface FiltroPedidos {
   status?: Pedido["status"];
   marca?: string;
+  clienteId?: string;
   /** Casa número do pedido, marca ou nome do cliente vinculado. */
   busca?: string;
+}
+
+/** Cópia completa da base local — baixada como .json e usada para restaurar em outro aparelho. */
+export interface BackupDados {
+  versao: 1;
+  geradoEm: string;
+  clientes: Cliente[];
+  produtos: Produto[];
+  pedidos: Pedido[];
+  representante?: Representante;
+  ultimaImportacao?: ImportacaoInfo;
 }

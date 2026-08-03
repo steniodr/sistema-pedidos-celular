@@ -1,5 +1,11 @@
 import { lerNumeroBR } from "../../domain/calculos";
-import { normalizarChave } from "../../domain/texto";
+import {
+  cabecalhoNormalizado,
+  encontrarIndice,
+  linhaVazia,
+  textoDaCelula,
+  type LinhaIgnorada,
+} from "../../domain/planilha";
 import type { EntradaProduto } from "../../data/repository";
 
 /**
@@ -34,10 +40,7 @@ export interface ColunasMatriz {
 
 export type FormatoPlanilha = "matriz" | "lista";
 
-export interface LinhaIgnorada {
-  linha: number;
-  motivo: string;
-}
+export type { LinhaIgnorada };
 
 export interface ResultadoConversao {
   produtos: EntradaProduto[];
@@ -88,20 +91,8 @@ const ALIASES_VALOR = [
   "precounit",
 ];
 
-function encontrarIndice(chaves: string[], aliases: string[]): number | null {
-  for (const alias of aliases) {
-    const exato = chaves.indexOf(alias);
-    if (exato >= 0) return exato;
-  }
-  for (const alias of aliases) {
-    const parcial = chaves.findIndex((c) => c.includes(alias));
-    if (parcial >= 0) return parcial;
-  }
-  return null;
-}
-
 export function detectarMapeamentoLista(cabecalho: string[]): MapeamentoLista {
-  const chaves = cabecalho.map(normalizarChave);
+  const chaves = cabecalhoNormalizado(cabecalho);
   return {
     descricaoProduto: encontrarIndice(chaves, ALIASES_PRODUTO),
     embalagem: encontrarIndice(chaves, ALIASES_EMBALAGEM),
@@ -109,17 +100,11 @@ export function detectarMapeamentoLista(cabecalho: string[]): MapeamentoLista {
   };
 }
 
-/** Espaços, tabs e quebras de linha (o Excel usa Alt+Enter dentro da própria célula). */
-function textoDaCelula(valor: unknown): string {
-  if (valor === null || valor === undefined) return "";
-  return String(valor).replace(/\s+/g, " ").trim();
-}
-
 export function detectarColunasMatriz(
   cabecalho: string[],
   fixas: { categoria?: number | null; produto?: number | null; detalhes?: number | null } = {},
 ): ColunasMatriz {
-  const chaves = cabecalho.map(normalizarChave);
+  const chaves = cabecalhoNormalizado(cabecalho);
   const categoria = fixas.categoria !== undefined ? fixas.categoria : encontrarIndice(chaves, ALIASES_CATEGORIA);
   const produto = fixas.produto !== undefined ? fixas.produto : encontrarIndice(chaves, ALIASES_PRODUTO);
   const detalhes = fixas.detalhes !== undefined ? fixas.detalhes : encontrarIndice(chaves, ALIASES_DETALHES);
@@ -172,10 +157,6 @@ export function analisarLinhas(linhas: unknown[][], limiteBusca = 15): PlanilhaL
     mapeamentoLista: { descricaoProduto: null, embalagem: null, valorUnit: null },
     colunasMatriz: { categoria: null, produto: null, detalhes: null, embalagens: [] },
   };
-}
-
-function linhaVazia(linha: unknown[]): boolean {
-  return linha.every((c) => textoDaCelula(c) === "");
 }
 
 function converterLista(planilha: PlanilhaLida, mapeamento: MapeamentoLista): ResultadoConversao {

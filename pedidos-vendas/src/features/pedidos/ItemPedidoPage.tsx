@@ -7,6 +7,7 @@ import { Input, Textarea } from "../../components/ui/Field";
 import { BarraInferior, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, lerNumeroBR, totalItem } from "../../domain/calculos";
+import { mensagemErro } from "../../domain/erros";
 import type { ItemPedido, Produto } from "../../domain/types";
 import { usePedido } from "./usePedido";
 import css from "./pedidos.module.css";
@@ -168,7 +169,7 @@ export function ItemPedidoPage() {
       await atualizar({ itens: itens.map((it, i) => ({ ...it, item: i + 1 })) });
       navigate(`/pedidos/${pedido.id}`, { replace: true });
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível salvar o item.");
+      toast.erro(mensagemErro(e, "Não foi possível salvar o item."));
       setSalvando(false);
     }
   }

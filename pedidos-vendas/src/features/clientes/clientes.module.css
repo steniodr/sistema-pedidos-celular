@@ -16,3 +16,49 @@
   padding: 0;
   font-size: 1.1rem;
 }
+
+.resumoImport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.resumoImportItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.resumoImportValor {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.botoesRodape {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.botoesRodape > * {
+  flex: 1;
+  width: auto;
+}
+
+.tagSituacao {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tagSituacao--inativo {
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+}
+
+.tagSituacao--atencao {
+  background: var(--cor-alerta-fundo);
+  color: var(--cor-alerta);
+}

@@ -1,12 +1,28 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
-import { Button } from "../../components/ui/Button";
+import { useDebounce } from "../../hooks/useDebounce";
+import { Button, LinkButton } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Field";
-import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { BarraInferior, Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { mascararCpfCnpj } from "../../domain/cpfCnpj";
+import { normalizar } from "../../domain/texto";
 import css from "./clientes.module.css";
+
+const ORDENS = ["Nome", "Recentes"] as const;
+type Ordem = (typeof ORDENS)[number];
+
+/** Cliente "Ativo" ou sem situação (cadastro manual) não mostra tag — só o que pede atenção. */
+function tagSituacao(situacao: string | undefined) {
+  if (!situacao) return null;
+  const alvo = normalizar(situacao);
+  if (alvo.startsWith("ativo")) return null;
+  const variante = alvo.includes("inativo") ? "inativo" : "atencao";
+  return (
+    <span className={`${css.tagSituacao} ${css[`tagSituacao--${variante}`]}`}>{situacao}</span>
+  );
+}
 
 /**
  * Lista/busca de clientes. Quando chamada com `?selecionar=1`, funciona como
@@ -17,11 +33,22 @@ export function ClientesPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [busca, setBusca] = useState("");
+  const [ordem, setOrdem] = useState<Ordem>("Nome");
+  const buscaDebounced = useDebounce(busca);
 
   const selecionando = params.get("selecionar") === "1";
   const marca = params.get("marca") ?? "";
 
-  const { dados: clientes } = useDados(() => repo.listarClientes(busca), [repo, busca]);
+  const { dados: clientesBrutos } = useDados(
+    () => repo.listarClientes(buscaDebounced),
+    [repo, buscaDebounced],
+  );
+
+  const clientes = useMemo(() => {
+    if (!clientesBrutos) return clientesBrutos;
+    if (ordem === "Nome") return clientesBrutos;
+    return [...clientesBrutos].sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm));
+  }, [clientesBrutos, ordem]);
 
   function aoEscolher(id: string) {
     navigate(`/pedidos/novo?clienteId=${id}&marca=${encodeURIComponent(marca)}`, {
@@ -47,6 +74,10 @@ export function ClientesPage() {
         autoComplete="off"
       />
 
+      {!selecionando && clientes && clientes.length > 1 && (
+        <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />
+      )}
+
       {clientes?.length === 0 ? (
         <EstadoVazio
           titulo={busca ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
@@ -67,7 +98,10 @@ export function ClientesPage() {
               <Cartao key={cliente.id}>
                 <div className={css.linhaCliente}>
                   <div className={css.linhaClienteInfo}>
-                    <div className="texto-forte">{cliente.nome}</div>
+                    <div className="texto-forte">
+                      {cliente.nome}
+                      {tagSituacao(cliente.situacao)}
+                    </div>
                     <div className="texto-suave">
                       {mascararCpfCnpj(cliente.cpfCnpj)}
                       {cliente.cidadeEstado ? ` · ${cliente.cidadeEstado}` : ""}
@@ -89,9 +123,20 @@ export function ClientesPage() {
       )}
 
       <BarraInferior>
-        <Button bloco onClick={() => navigate(destinoNovo)}>
-          Novo cliente
-        </Button>
+        {selecionando ? (
+          <Button bloco onClick={() => navigate(destinoNovo)}>
+            Novo cliente
+          </Button>
+        ) : (
+          <div className={css.botoesRodape}>
+            <LinkButton to="/clientes/importar" variante="secundario" bloco>
+              Importar
+            </LinkButton>
+            <LinkButton to={destinoNovo} bloco>
+              Novo cliente
+            </LinkButton>
+          </div>
+        )}
       </BarraInferior>
     </Tela>
   );

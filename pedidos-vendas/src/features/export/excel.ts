@@ -291,7 +291,7 @@ function construirDoZero(workbook: Workbook, dados: DadosExportacao): Workbook {
     "Condição de pagamento",
     dados.cliente.condicaoPagamento,
   );
-  par(7, "Local da Entrega", dados.cliente.localEntrega);
+  par(7, "Local da Entrega", dados.cliente.obsGerais);
 
   // Tabela de itens
   const linhaCabecalho = 9;

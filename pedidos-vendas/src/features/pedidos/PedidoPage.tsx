@@ -1,14 +1,21 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useRepository } from "../../data/RepositoryContext";
 import { Button } from "../../components/ui/Button";
 import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido, totalItem } from "../../domain/calculos";
+import { mensagemErro } from "../../domain/erros";
 import { usePedido } from "./usePedido";
 import css from "./pedidos.module.css";
 
 export function PedidoPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const repo = useRepository();
+  const toast = useToast();
   const { pedido, cliente, carregando, atualizar } = usePedido(id);
+  const [excluindo, setExcluindo] = useState(false);
 
   if (carregando) return <Tela titulo="Pedido" voltar="/">{null}</Tela>;
   if (!pedido) {
@@ -29,12 +36,35 @@ export function PedidoPage() {
     await atualizar({ itens });
   }
 
+  async function excluirPedido() {
+    if (!pedido) return;
+    if (!window.confirm(`Excluir o pedido nº ${pedido.numero}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    setExcluindo(true);
+    try {
+      await repo.removerPedido(pedido.id);
+      const pedidoApagado = pedido;
+      toast.acao("Pedido excluído.", "Desfazer", () => {
+        void repo.restaurarPedido(pedidoApagado);
+      });
+      navigate("/pedidos", { replace: true });
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível excluir o pedido."));
+      setExcluindo(false);
+    }
+  }
+
   return (
     <Tela titulo={`Pedido nº ${pedido.numero}`} voltar="/" comBarraInferior>
       <Cartao>
         <div className="texto-forte">{cliente?.nome ?? "Cliente removido"}</div>
         <div className="texto-suave">{pedido.marca || "Sem marca"}</div>
       </Cartao>
+
+      <Button variante="perigo" onClick={excluirPedido} disabled={excluindo}>
+        {excluindo ? "Excluindo…" : "Excluir pedido"}
+      </Button>
 
       <div className="linha linha--entre">
         <h2 className="secao-titulo">Itens ({pedido.itens.length})</h2>

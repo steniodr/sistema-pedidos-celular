@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button, LinkButton } from "../../components/ui/Button";
@@ -6,9 +6,13 @@ import { Input } from "../../components/ui/Field";
 import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { mascararTelefone } from "../../domain/cpfCnpj";
+import { mensagemErro } from "../../domain/erros";
 import type { Representante } from "../../domain/types";
+import type { BackupDados } from "../../data/repository";
 import { semearClientesTeste } from "../clientes/clientesTeste";
+import { gerarPedidosTeste } from "../pedidos/pedidosTeste";
 import { avaliarBase, formatarDataHora } from "../produtos/statusBase";
+import { baixarArquivo } from "../export/dadosExportacao";
 
 const VAZIO: Representante = { nome: "", telefone: "", email: "" };
 
@@ -18,6 +22,10 @@ export function ConfigPage() {
   const [form, setForm] = useState<Representante>(VAZIO);
   const [salvando, setSalvando] = useState(false);
   const [semeando, setSemeando] = useState(false);
+  const [semeandoPedidos, setSemeandoPedidos] = useState(false);
+  const [gerandoBackup, setGerandoBackup] = useState(false);
+  const [restaurando, setRestaurando] = useState(false);
+  const inputBackup = useRef<HTMLInputElement>(null);
 
   const { dados: salvo } = useDados(() => repo.obterRepresentante(), [repo]);
   const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
@@ -33,7 +41,7 @@ export function ConfigPage() {
       await repo.salvarRepresentante(form);
       toast.sucesso("Dados do representante salvos.");
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível salvar.");
+      toast.erro(mensagemErro(e, "Não foi possível salvar."));
     } finally {
       setSalvando(false);
     }
@@ -49,9 +57,61 @@ export function ConfigPage() {
           : "Os clientes de teste já existem.",
       );
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível criar os clientes de teste.");
+      toast.erro(mensagemErro(e, "Não foi possível criar os clientes de teste."));
     } finally {
       setSemeando(false);
+    }
+  }
+
+  async function criarPedidosTeste() {
+    setSemeandoPedidos(true);
+    try {
+      const criados = await gerarPedidosTeste(repo);
+      toast.sucesso(`${criados} pedido(s) de teste criado(s) para validar os Relatórios.`);
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível criar os pedidos de teste."));
+    } finally {
+      setSemeandoPedidos(false);
+    }
+  }
+
+  async function baixarBackup() {
+    setGerandoBackup(true);
+    try {
+      const dados = await repo.exportarBackup();
+      const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+      const hoje = dados.geradoEm.slice(0, 10);
+      baixarArquivo(blob, `backup-pedidos-${hoje}.json`);
+      toast.sucesso("Backup baixado.");
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível gerar o backup."));
+    } finally {
+      setGerandoBackup(false);
+    }
+  }
+
+  async function restaurarDeArquivo(arquivo: File | undefined) {
+    if (!arquivo) return;
+    if (
+      !window.confirm(
+        "Restaurar este backup substitui TODOS os clientes, produtos e pedidos deste aparelho pelo conteúdo do arquivo. Continuar?",
+      )
+    ) {
+      return;
+    }
+    setRestaurando(true);
+    try {
+      const texto = await arquivo.text();
+      const dados = JSON.parse(texto) as BackupDados;
+      if (!Array.isArray(dados.clientes) || !Array.isArray(dados.produtos) || !Array.isArray(dados.pedidos)) {
+        throw new Error("Arquivo de backup inválido.");
+      }
+      await repo.restaurarBackup(dados);
+      toast.sucesso("Backup restaurado.");
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível restaurar o backup."));
+    } finally {
+      setRestaurando(false);
     }
   }
 
@@ -91,6 +151,33 @@ export function ConfigPage() {
         Importar base de produtos
       </LinkButton>
 
+      <h2 className="secao-titulo">Backup</h2>
+      <p className="texto-suave">
+        Guarda uma cópia de clientes, produtos e pedidos deste aparelho num
+        arquivo .json — útil antes de trocar de celular (ainda não existe
+        sincronização automática entre vendedores).
+      </p>
+      <Button variante="secundario" onClick={baixarBackup} disabled={gerandoBackup}>
+        {gerandoBackup ? "Gerando…" : "Baixar backup (.json)"}
+      </Button>
+      <input
+        ref={inputBackup}
+        type="file"
+        accept="application/json"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          void restaurarDeArquivo(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        variante="secundario"
+        onClick={() => inputBackup.current?.click()}
+        disabled={restaurando}
+      >
+        {restaurando ? "Restaurando…" : "Restaurar backup"}
+      </Button>
+
       <h2 className="secao-titulo">Testes</h2>
       <p className="texto-suave">
         Cria 2 clientes de exemplo (“(teste)” no nome) para experimentar o app sem
@@ -99,6 +186,13 @@ export function ConfigPage() {
       </p>
       <Button variante="secundario" onClick={criarClientesTeste} disabled={semeando}>
         {semeando ? "Criando…" : "Criar clientes de teste"}
+      </Button>
+      <p className="texto-suave">
+        Cria pedidos de exemplo espalhados em semanas/meses diferentes, com
+        marcas e clientes variados — só para validar a tela de Relatórios.
+      </p>
+      <Button variante="secundario" onClick={criarPedidosTeste} disabled={semeandoPedidos}>
+        {semeandoPedidos ? "Criando…" : "Criar pedidos de teste"}
       </Button>
 
       <BarraInferior>

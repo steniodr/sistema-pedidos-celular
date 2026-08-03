@@ -211,12 +211,28 @@
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 14px;
   border-radius: var(--raio-pequeno);
   color: #fff;
   background: #0f172a;
   box-shadow: var(--sombra);
   font-size: 0.9375rem;
+  pointer-events: auto;
+}
+
+.toastAcao {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
 }
 
 .toast--erro {

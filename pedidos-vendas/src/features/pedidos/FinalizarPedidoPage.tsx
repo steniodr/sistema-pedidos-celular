@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
+import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Field";
 import { SelectComOutro } from "../../components/ui/SelectComOutro";
@@ -9,10 +10,12 @@ import { StatusPedido } from "../../components/ui/StatusPedido";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
 import { validarCpfCnpj } from "../../domain/cpfCnpj";
+import { mensagemErro } from "../../domain/erros";
 import { FORMAS_SOLICITACAO } from "../../domain/formasSolicitacao";
 import { baixarArquivo, montarDadosExportacao, nomeArquivo } from "../export/dadosExportacao";
 import { gerarExcel, modeloDisponivel } from "../export/excel";
 import { gerarPdf } from "../export/pdf";
+import { avaliarBase } from "../produtos/statusBase";
 import { usePedido } from "./usePedido";
 import css from "./pedidos.module.css";
 
@@ -25,6 +28,8 @@ export function FinalizarPedidoPage() {
   const [exportando, setExportando] = useState<"excel" | "pdf" | null>(null);
   const [exportado, setExportado] = useState(false);
   const [temModelo, setTemModelo] = useState<boolean | null>(null);
+  const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
+  const statusBase = avaliarBase(importacao);
 
   useEffect(() => {
     void modeloDisponivel().then(setTemModelo);
@@ -55,6 +60,12 @@ export function FinalizarPedidoPage() {
 
   async function exportar(formato: "excel" | "pdf") {
     if (!pedido || !podeExportar) return;
+    if (statusBase.nivel === "critico") {
+      const confirmado = window.confirm(
+        `${statusBase.mensagem} Os preços deste pedido podem estar desatualizados. Finalizar mesmo assim?`,
+      );
+      if (!confirmado) return;
+    }
     setExportando(formato);
     try {
       const dados = montarDadosExportacao(pedido, cliente);
@@ -67,7 +78,7 @@ export function FinalizarPedidoPage() {
       setExportado(true);
       toast.sucesso(formato === "excel" ? "Excel gerado." : "PDF gerado.");
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Falha ao gerar o arquivo.");
+      toast.erro(mensagemErro(e, "Falha ao gerar o arquivo."));
     } finally {
       setExportando(null);
     }

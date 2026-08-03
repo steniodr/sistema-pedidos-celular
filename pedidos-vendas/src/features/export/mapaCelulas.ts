@@ -88,7 +88,7 @@ export const MAPA_PADRAO: MapaModelo = {
     G6: (d) => d.cliente.cep,
     D7: (d) => d.cliente.transportadora,
     F7: (d) => d.cliente.condicaoPagamento,
-    D8: (d) => d.cliente.localEntrega,
+    D8: (d) => d.cliente.obsGerais,
   },
   itens: {
     primeiraLinha: 11,

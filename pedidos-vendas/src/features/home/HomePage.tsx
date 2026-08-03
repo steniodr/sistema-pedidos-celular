@@ -54,8 +54,11 @@ export function HomePage() {
           <LinkButton to="/produtos" variante="secundario">
             Produtos ({dados?.totalProdutos ?? 0})
           </LinkButton>
-          <LinkButton to="/pedidos" variante="secundario" className={css.atalhoHistorico}>
+          <LinkButton to="/pedidos" variante="secundario">
             Histórico
+          </LinkButton>
+          <LinkButton to="/relatorios" variante="secundario">
+            Relatórios
           </LinkButton>
         </div>
 

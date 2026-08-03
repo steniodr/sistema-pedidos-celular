@@ -7,6 +7,7 @@ import { Input } from "../../components/ui/Field";
 import { BarraInferior, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { lerNumeroBR } from "../../domain/calculos";
+import { mensagemErro } from "../../domain/erros";
 import type { EntradaProdutoUnico } from "../../data/repository";
 
 const VAZIO: EntradaProdutoUnico = { nome: "", detalhes: "", embalagem: "", valorUnit: 0 };
@@ -56,24 +57,27 @@ export function ProdutoFormPage() {
       toast.sucesso("Produto salvo.");
       navigate(-1);
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível salvar o produto.");
+      toast.erro(mensagemErro(e, "Não foi possível salvar o produto."));
     } finally {
       setSalvando(false);
     }
   }
 
   async function excluir() {
-    if (!id) return;
-    if (!window.confirm(`Excluir o produto "${produto?.nome ?? ""}"? Esta ação não pode ser desfeita.`)) {
+    if (!id || !produto) return;
+    if (!window.confirm(`Excluir o produto "${produto.nome}"? Esta ação não pode ser desfeita.`)) {
       return;
     }
     setExcluindo(true);
     try {
       await repo.removerProduto(id);
-      toast.sucesso("Produto excluído.");
+      const produtoApagado = produto;
+      toast.acao("Produto excluído.", "Desfazer", () => {
+        void repo.restaurarProduto(produtoApagado);
+      });
       navigate("/produtos", { replace: true });
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível excluir o produto.");
+      toast.erro(mensagemErro(e, "Não foi possível excluir o produto."));
       setExcluindo(false);
     }
   }

@@ -77,7 +77,8 @@ describe("fluxo do pedido", () => {
     );
 
     abrir("/clientes/novo");
-    await preencher(/^Nome/, "Tintas do Vale");
+    // Exclui "Nome fantasia" (também presente na tela) do casamento.
+    await preencher(/^Nome(?! fantasia)/, "Tintas do Vale");
     await preencher(/CPF \/ CNPJ/, "11222333000181");
     await userEvent.click(screen.getByRole("button", { name: "Salvar cliente" }));
 
@@ -217,6 +218,65 @@ describe("fluxo do pedido", () => {
     const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
     expect(botao.hasAttribute("disabled")).toBe(true);
   });
+
+  it("exporta um pedido válido e marca como enviado", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Válido",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
+    expect(botaoExcel.hasAttribute("disabled")).toBe(false);
+
+    await userEvent.click(botaoExcel);
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.status).toBe("enviado");
+    });
+    expect(await screen.findByText("Excel gerado.")).toBeDefined();
+  });
+
+  it("exige confirmação extra ao finalizar com a base de preços crítica (>90 dias)", async () => {
+    await db.meta.put({
+      chave: "ultimaImportacao",
+      valor: {
+        arquivo: "tabela-antiga.xlsx",
+        quandoEm: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
+        totalProdutos: 10,
+      },
+    });
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Válido",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
+    await userEvent.click(botaoExcel);
+
+    // Cancelou a confirmação: não deve exportar nem marcar como enviado.
+    expect(confirmar).toHaveBeenCalled();
+    const aindaRascunho = await dexieRepository.obterPedido(pedido.id);
+    expect(aindaRascunho?.status).toBe("rascunho");
+    confirmar.mockRestore();
+  });
 });
 
 describe("histórico", () => {
@@ -269,5 +329,28 @@ describe("clientes de teste", () => {
     });
     expect(confirmar).toHaveBeenCalled();
     confirmar.mockRestore();
+  });
+
+  it("avisa quantos pedidos ficam sem cliente ao excluir, e o Desfazer restaura", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Com Pedido",
+      cpfCnpj: "52998224725",
+    });
+    await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    abrir(`/clientes/${cliente.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "Excluir cliente" }));
+
+    await waitFor(async () => {
+      expect(await dexieRepository.listarClientes()).toHaveLength(0);
+    });
+    expect(confirmar.mock.calls[0][0]).toMatch(/1 pedido\(s\) registrado\(s\)/);
+    confirmar.mockRestore();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Desfazer" }));
+    await waitFor(async () => {
+      expect(await dexieRepository.listarClientes()).toHaveLength(1);
+    });
   });
 });

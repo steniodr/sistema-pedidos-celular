@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Field";
+import { Input, Textarea } from "../../components/ui/Field";
 import { SelectComOutro } from "../../components/ui/SelectComOutro";
 import { BarraInferior, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
@@ -14,12 +14,15 @@ import {
   validarCpfCnpj,
 } from "../../domain/cpfCnpj";
 import { CONDICOES_PAGAMENTO } from "../../domain/condicoesPagamento";
+import { mensagemErro } from "../../domain/erros";
 import type { EntradaCliente } from "../../data/repository";
 
 const VAZIO: EntradaCliente = {
   nome: "",
+  nomeFantasia: "",
   cpfCnpj: "",
   codigoCliente: "",
+  contato: "",
   telefone: "",
   endereco: "",
   bairro: "",
@@ -27,7 +30,7 @@ const VAZIO: EntradaCliente = {
   cep: "",
   transportadora: "",
   condicaoPagamento: "",
-  localEntrega: "",
+  obsGerais: "",
 };
 
 export function ClienteFormPage() {
@@ -92,24 +95,31 @@ export function ClienteFormPage() {
         navigate(-1);
       }
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível salvar o cliente.");
+      toast.erro(mensagemErro(e, "Não foi possível salvar o cliente."));
     } finally {
       setSalvando(false);
     }
   }
 
   async function excluir() {
-    if (!id) return;
-    if (!window.confirm(`Excluir o cliente "${cliente?.nome ?? ""}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
+    if (!id || !cliente) return;
+    const vinculados = await repo.listarPedidos({ clienteId: id });
+    const aviso =
+      vinculados.length > 0
+        ? `Este cliente tem ${vinculados.length} pedido(s) registrado(s). Os pedidos continuam existindo, mas o nome do cliente some deles. Excluir mesmo assim?`
+        : `Excluir o cliente "${cliente.nome}"? Esta ação não pode ser desfeita.`;
+    if (!window.confirm(aviso)) return;
+
     setExcluindo(true);
     try {
       await repo.removerCliente(id);
-      toast.sucesso("Cliente excluído.");
+      const clienteApagado = cliente;
+      toast.acao("Cliente excluído.", "Desfazer", () => {
+        void repo.restaurarCliente(clienteApagado);
+      });
       navigate("/clientes", { replace: true });
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível excluir o cliente.");
+      toast.erro(mensagemErro(e, "Não foi possível excluir o cliente."));
       setExcluindo(false);
     }
   }
@@ -142,12 +152,25 @@ export function ClienteFormPage() {
         ajuda="Validado ao sair do campo. O pedido só é finalizado com documento válido."
       />
       <Input
+        rotulo="Nome fantasia"
+        value={form.nomeFantasia ?? ""}
+        onChange={(e) => campo("nomeFantasia", e.target.value)}
+      />
+      <Input
         rotulo="Código do cliente"
         value={form.codigoCliente ?? ""}
         onChange={(e) => campo("codigoCliente", e.target.value)}
       />
+      {form.situacao && (
+        <Input rotulo="Situação (base importada)" value={form.situacao} readOnly disabled />
+      )}
 
       <h2 className="secao-titulo">Contato e endereço</h2>
+      <Input
+        rotulo="Contato"
+        value={form.contato ?? ""}
+        onChange={(e) => campo("contato", e.target.value)}
+      />
       <Input
         rotulo="Telefone"
         inputMode="tel"
@@ -189,10 +212,11 @@ export function ClienteFormPage() {
         value={form.condicaoPagamento ?? ""}
         onChange={(valor) => campo("condicaoPagamento", valor)}
       />
-      <Input
-        rotulo="Local da entrega"
-        value={form.localEntrega ?? ""}
-        onChange={(e) => campo("localEntrega", e.target.value)}
+      <Textarea
+        rotulo="Observações"
+        ajuda="Entrega, horário de recebimento, financeiro etc."
+        value={form.obsGerais ?? ""}
+        onChange={(e) => campo("obsGerais", e.target.value)}
       />
 
       {id && (

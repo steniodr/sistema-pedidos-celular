@@ -7,6 +7,7 @@ import { Input } from "../../components/ui/Field";
 import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { mascararCpfCnpj } from "../../domain/cpfCnpj";
+import { mensagemErro } from "../../domain/erros";
 
 /**
  * Passo 1 do pedido: marca (texto livre do cabeçalho) + cliente.
@@ -60,7 +61,7 @@ export function NovoPedidoPage() {
       const pedido = await repo.criarPedido({ clienteId, marca: marca.trim() });
       navigate(`/pedidos/${pedido.id}`, { replace: true });
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível criar o pedido.");
+      toast.erro(mensagemErro(e, "Não foi possível criar o pedido."));
       setCriando(false);
     }
   }

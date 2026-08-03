@@ -8,8 +8,12 @@ export type ISODateTime = string;
 export interface Cliente {
   id: string;
   nome: string;
+  /** Nome fantasia, quando diferente da razão social (ex.: planilhas de base de clientes). */
+  nomeFantasia?: string;
   cpfCnpj: string;
   codigoCliente?: string;
+  /** Nome da pessoa de contato no cliente. */
+  contato?: string;
   telefone?: string;
   endereco?: string;
   bairro?: string;
@@ -17,7 +21,10 @@ export interface Cliente {
   cep?: string;
   transportadora?: string;
   condicaoPagamento?: string;
-  localEntrega?: string;
+  /** Observações gerais (entrega, horário de recebimento, financeiro etc.). */
+  obsGerais?: string;
+  /** Situação do cliente vinda da base importada (ex.: "Ativo", "Inativo"); texto livre, sem lista fechada. */
+  situacao?: string;
   criadoEm: ISODateTime;
   atualizadoEm: ISODateTime;
 }

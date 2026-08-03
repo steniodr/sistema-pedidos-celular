@@ -28,7 +28,7 @@ export function avaliarBase(
 
   const dias = Math.floor((agora.getTime() - new Date(info.quandoEm).getTime()) / DIA_MS);
 
-  if (dias > 60) {
+  if (dias > 90) {
     return {
       nivel: "critico",
       diasDesdeImportacao: dias,

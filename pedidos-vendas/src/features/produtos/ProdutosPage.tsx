@@ -1,22 +1,37 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
+import { useDebounce } from "../../hooks/useDebounce";
 import { Button, LinkButton } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Field";
-import { BarraInferior, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { BarraInferior, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { formatarMoeda } from "../../domain/calculos";
 import { AvisoBase } from "./AvisoBase";
 import { avaliarBase, formatarDataHora } from "./statusBase";
 import css from "./produtos.module.css";
 
+const ORDENS = ["Nome", "Valor"] as const;
+type Ordem = (typeof ORDENS)[number];
+
 export function ProdutosPage() {
   const repo = useRepository();
   const navigate = useNavigate();
   const [busca, setBusca] = useState("");
+  const [ordem, setOrdem] = useState<Ordem>("Nome");
+  const buscaDebounced = useDebounce(busca);
 
-  const { dados: produtos } = useDados(() => repo.listarProdutos(busca, 100), [repo, busca]);
+  const { dados: produtosBrutos } = useDados(
+    () => repo.listarProdutos(buscaDebounced, 100),
+    [repo, buscaDebounced],
+  );
   const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
+
+  const produtos = useMemo(() => {
+    if (!produtosBrutos) return produtosBrutos;
+    if (ordem === "Nome") return produtosBrutos;
+    return [...produtosBrutos].sort((a, b) => a.valorUnit - b.valorUnit);
+  }, [produtosBrutos, ordem]);
 
   const status = avaliarBase(importacao);
 
@@ -37,6 +52,8 @@ export function ProdutosPage() {
         onChange={(e) => setBusca(e.target.value)}
         autoComplete="off"
       />
+
+      {produtos && produtos.length > 1 && <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />}
 
       {produtos?.length === 0 ? (
         <EstadoVazio

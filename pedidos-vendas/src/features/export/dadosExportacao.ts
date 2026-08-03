@@ -21,7 +21,7 @@ export interface DadosExportacao {
     cep: string;
     transportadora: string;
     condicaoPagamento: string;
-    localEntrega: string;
+    obsGerais: string;
   };
   representante: {
     nome: string;
@@ -66,7 +66,7 @@ export function montarDadosExportacao(
       cep: cliente?.cep ? mascararCep(cliente.cep) : "",
       transportadora: cliente?.transportadora ?? "",
       condicaoPagamento: cliente?.condicaoPagamento ?? "",
-      localEntrega: cliente?.localEntrega ?? "",
+      obsGerais: cliente?.obsGerais ?? "",
     },
     representante: {
       nome: pedido.representanteNome ?? "",

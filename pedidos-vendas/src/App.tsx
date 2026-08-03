@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { HomePage } from "./features/home/HomePage";
 import { ClientesPage } from "./features/clientes/ClientesPage";
 import { ClienteFormPage } from "./features/clientes/ClienteFormPage";
+import { ImportarClientesPage } from "./features/clientes/ImportarClientesPage";
 import { ProdutosPage } from "./features/produtos/ProdutosPage";
 import { ProdutoFormPage } from "./features/produtos/ProdutoFormPage";
 import { ImportarProdutosPage } from "./features/produtos/ImportarProdutosPage";
@@ -11,6 +12,7 @@ import { ItemPedidoPage } from "./features/pedidos/ItemPedidoPage";
 import { ResumoPedidoPage } from "./features/pedidos/ResumoPedidoPage";
 import { FinalizarPedidoPage } from "./features/pedidos/FinalizarPedidoPage";
 import { HistoricoPage } from "./features/pedidos/HistoricoPage";
+import { RelatoriosPage } from "./features/relatorios/RelatoriosPage";
 import { ConfigPage } from "./features/config/ConfigPage";
 
 export function App() {
@@ -20,6 +22,7 @@ export function App() {
 
       <Route path="/clientes" element={<ClientesPage />} />
       <Route path="/clientes/novo" element={<ClienteFormPage />} />
+      <Route path="/clientes/importar" element={<ImportarClientesPage />} />
       <Route path="/clientes/:id" element={<ClienteFormPage />} />
 
       <Route path="/produtos" element={<ProdutosPage />} />
@@ -33,6 +36,8 @@ export function App() {
       <Route path="/pedidos/:id/item/:indice" element={<ItemPedidoPage />} />
       <Route path="/pedidos/:id/resumo" element={<ResumoPedidoPage />} />
       <Route path="/pedidos/:id/finalizar" element={<FinalizarPedidoPage />} />
+
+      <Route path="/relatorios" element={<RelatoriosPage />} />
 
       <Route path="/config" element={<ConfigPage />} />
 

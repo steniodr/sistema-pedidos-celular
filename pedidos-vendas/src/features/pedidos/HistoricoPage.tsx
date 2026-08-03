@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
+import { useDebounce } from "../../hooks/useDebounce";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Field";
 import { Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { StatusPedido as StatusPedidoTag } from "../../components/ui/StatusPedido";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
+import { mensagemErro } from "../../domain/erros";
 import { formatarData } from "../produtos/statusBase";
 import type { StatusPedido } from "../../domain/types";
 import css from "./pedidos.module.css";
@@ -15,6 +17,9 @@ import css from "./pedidos.module.css";
 const FILTROS = ["Todos", "Rascunhos", "Enviados"] as const;
 type Filtro = (typeof FILTROS)[number];
 const TODAS_MARCAS = "Todas";
+
+const ORDENS = ["Recentes", "Maior valor"] as const;
+type Ordem = (typeof ORDENS)[number];
 
 const STATUS_POR_FILTRO: Record<Filtro, StatusPedido | undefined> = {
   Todos: undefined,
@@ -28,7 +33,9 @@ export function HistoricoPage() {
   const toast = useToast();
   const [filtro, setFiltro] = useState<Filtro>("Todos");
   const [marcaFiltro, setMarcaFiltro] = useState(TODAS_MARCAS);
+  const [ordem, setOrdem] = useState<Ordem>("Recentes");
   const [busca, setBusca] = useState("");
+  const buscaDebounced = useDebounce(busca);
 
   const { dados: contexto } = useDados(async () => {
     const [todosPedidos, clientes] = await Promise.all([
@@ -41,15 +48,23 @@ export function HistoricoPage() {
     };
   }, [repo]);
 
-  const { dados: pedidos, recarregar } = useDados(
+  const { dados: pedidosBrutos, recarregar } = useDados(
     () =>
       repo.listarPedidos({
         status: STATUS_POR_FILTRO[filtro],
         marca: marcaFiltro === TODAS_MARCAS ? undefined : marcaFiltro,
-        busca,
+        busca: buscaDebounced,
       }),
-    [repo, filtro, marcaFiltro, busca],
+    [repo, filtro, marcaFiltro, buscaDebounced],
   );
+
+  const pedidos = useMemo(() => {
+    if (!pedidosBrutos) return pedidosBrutos;
+    if (ordem === "Recentes") return pedidosBrutos;
+    return [...pedidosBrutos].sort(
+      (a, b) => totaisPedido(b).total - totaisPedido(a).total,
+    );
+  }, [pedidosBrutos, ordem]);
 
   async function duplicar(id: string) {
     try {
@@ -57,7 +72,7 @@ export function HistoricoPage() {
       toast.sucesso(`Pedido nº ${copia.numero} criado.`);
       navigate(`/pedidos/${copia.id}`);
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível duplicar.");
+      toast.erro(mensagemErro(e, "Não foi possível duplicar."));
       recarregar();
     }
   }
@@ -83,6 +98,12 @@ export function HistoricoPage() {
         onChange={(e) => setBusca(e.target.value)}
         autoComplete="off"
       />
+
+      {pedidos && pedidos.length > 1 && (
+        <div className={css.filtros}>
+          <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />
+        </div>
+      )}
 
       {pedidos?.length === 0 ? (
         <EstadoVazio titulo="Nenhum pedido neste filtro" />

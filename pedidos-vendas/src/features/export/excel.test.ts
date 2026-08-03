@@ -22,7 +22,7 @@ const cliente: Cliente = {
   cep: "79002000",
   transportadora: "Rodoviário Sul",
   condicaoPagamento: "28/35/42 dias",
-  localEntrega: "Depósito central",
+  obsGerais: "Depósito central",
   criadoEm: "2026-07-01T10:00:00.000Z",
   atualizadoEm: "2026-07-01T10:00:00.000Z",
 };

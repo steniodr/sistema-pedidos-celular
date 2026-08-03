@@ -65,7 +65,7 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
     ["Cidade / UF", [dados.cliente.cidadeEstado, dados.cliente.cep].filter(Boolean).join(" · ")],
     ["Transportadora", dados.cliente.transportadora],
     ["Pagamento", dados.cliente.condicaoPagamento],
-    ["Local da entrega", dados.cliente.localEntrega],
+    ["Local da entrega", dados.cliente.obsGerais],
   ]);
 
   y += 6;

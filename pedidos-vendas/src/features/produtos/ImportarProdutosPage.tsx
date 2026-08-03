@@ -6,6 +6,7 @@ import { Select } from "../../components/ui/Field";
 import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda } from "../../domain/calculos";
+import { mensagemErro } from "../../domain/erros";
 import { lerArquivoPlanilha } from "./lerArquivo";
 import {
   converter,
@@ -56,7 +57,7 @@ export function ImportarProdutosPage() {
         toast.info("Não identifiquei o cabeçalho. Confira as colunas abaixo.");
       }
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Não foi possível ler o arquivo.");
+      toast.erro(mensagemErro(e, "Não foi possível ler o arquivo."));
       setPlanilha(null);
       setMapeamentoLista(null);
       setColunasMatriz(null);
@@ -85,7 +86,7 @@ export function ImportarProdutosPage() {
       toast.sucesso(`${info.totalProdutos} combinações de produto importadas.`);
       navigate("/produtos", { replace: true });
     } catch (e) {
-      toast.erro(e instanceof Error ? e.message : "Falha ao gravar a base.");
+      toast.erro(mensagemErro(e, "Falha ao gravar a base."));
     } finally {
       setConfirmando(false);
     }

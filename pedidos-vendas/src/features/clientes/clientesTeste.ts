@@ -18,7 +18,7 @@ const CLIENTES_TESTE: EntradaCliente[] = [
     cep: "79002000",
     transportadora: "Rodoviário Sul",
     condicaoPagamento: "28/35/42 dias",
-    localEntrega: "Depósito central",
+    obsGerais: "Depósito central",
   },
   {
     nome: "Tintas do Vale Ltda (teste)",
@@ -31,7 +31,7 @@ const CLIENTES_TESTE: EntradaCliente[] = [
     cep: "79020000",
     transportadora: "FOB - Transportadora",
     condicaoPagamento: "A combinar",
-    localEntrega: "Loja",
+    obsGerais: "Loja",
   },
 ];
 
