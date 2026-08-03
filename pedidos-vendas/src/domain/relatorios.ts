@@ -84,7 +84,13 @@ export interface ProdutoMaisVendido {
   valorTotal: number;
 }
 
-export function produtosMaisVendidos(pedidos: Pedido[], limite = 10): ProdutoMaisVendido[] {
+export type OrdemValor = "desc" | "asc";
+
+export function produtosMaisVendidos(
+  pedidos: Pedido[],
+  limite = 10,
+  ordem: OrdemValor = "desc",
+): ProdutoMaisVendido[] {
   const porNome = new Map<string, ProdutoMaisVendido>();
   for (const pedido of pedidos) {
     for (const item of pedido.itens) {
@@ -95,5 +101,8 @@ export function produtosMaisVendidos(pedidos: Pedido[], limite = 10): ProdutoMai
       porNome.set(nome, atual);
     }
   }
-  return [...porNome.values()].sort((a, b) => b.valorTotal - a.valorTotal).slice(0, limite);
+  const sinal = ordem === "desc" ? -1 : 1;
+  return [...porNome.values()]
+    .sort((a, b) => sinal * (a.valorTotal - b.valorTotal))
+    .slice(0, limite);
 }

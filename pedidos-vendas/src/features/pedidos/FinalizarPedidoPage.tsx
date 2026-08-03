@@ -123,6 +123,12 @@ export function FinalizarPedidoPage() {
         value={pedido.dataPedido}
         onChange={(e) => atualizar({ dataPedido: e.target.value })}
       />
+      <Input
+        rotulo="Horário do pedido"
+        type="time"
+        value={pedido.horaPedido ?? ""}
+        onChange={(e) => atualizar({ horaPedido: e.target.value })}
+      />
       <SelectComOutro
         rotulo="Forma de solicitação"
         opcoes={FORMAS_SOLICITACAO}

@@ -40,6 +40,12 @@ no padrão oficial da empresa, sem precisar editar nada depois.
   uma vez — reimportar depois só atualiza quem já existe, sem duplicar.
 - **Relatório de vendas.** Total vendido, número de pedidos, ticket médio e
   produtos mais vendidos, filtrando por semana, mês, cliente ou marca.
+- **Histórico exportável.** Lista simples de quem foi visitado em cada dia
+  (horário, cliente, código), em PDF ou copiada como texto pra colar em
+  outro app — com opção de exportar tudo ou só os pedidos já enviados.
+- **Backup.** Um botão baixa toda a base do aparelho (clientes, produtos,
+  pedidos) num arquivo, e outro restaura — útil pra levar os dados na troca
+  de celular, hoje sem depender de sincronização automática.
 
 ## Tecnologia (resumo)
 
@@ -56,8 +62,9 @@ mesmo tempo, sem reinstalação manual.
   nenhum servidor dedicado para manter no ar — a solução foi pensada para
   ter o menor custo operacional possível de infraestrutura.
 - Roda em qualquer celular com navegador, sem exigir aparelho específico.
-- Atualizações chegam automaticamente a todos os vendedores assim que
-  publicadas, sem passo manual de reinstalar o app.
+- Atualizações chegam a todos os vendedores assim que publicadas, sem passo
+  manual de reinstalar o app — o próprio app checa periodicamente e também
+  tem um botão para forçar a atualização na hora, se precisar.
 - Reduz erro humano e tempo gasto formatando planilha depois do pedido
   feito em campo.
 
@@ -65,8 +72,9 @@ mesmo tempo, sem reinstalação manual.
 
 O app já cobre o fluxo completo de cadastro de cliente (incluindo importação
 em lote), base de produtos, montagem de pedido, exportação em Excel/PDF no
-molde oficial, histórico de pedidos e relatório de vendas. A sincronização
-automática entre vendedores (nuvem) é o próximo passo planejado — hoje cada
-aparelho guarda seus próprios dados.
+molde oficial, histórico de pedidos (exportável em PDF/texto), relatório de
+vendas e backup da base local. A sincronização automática entre vendedores
+(nuvem) é o próximo passo planejado — hoje cada aparelho guarda seus
+próprios dados.
 
 Detalhes técnicos e de organização do código: [pedidos-vendas/README.md](pedidos-vendas/README.md).

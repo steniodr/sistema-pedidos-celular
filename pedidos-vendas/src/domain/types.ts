@@ -68,6 +68,8 @@ export interface Pedido {
   marca: string;
   clienteId: string;
   dataPedido: string;
+  /** Horário do pedido, formato "HH:mm" — editável, igual à data. */
+  horaPedido?: string;
   representanteNome?: string;
   representanteTelefone?: string;
   representanteEmail?: string;

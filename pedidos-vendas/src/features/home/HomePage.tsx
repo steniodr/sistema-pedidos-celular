@@ -1,17 +1,20 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button, LinkButton } from "../../components/ui/Button";
-import { Cartao, EstadoVazio } from "../../components/ui/Layout";
+import { Cartao, EstadoVazio, Sheet } from "../../components/ui/Layout";
 import { StatusPedido } from "../../components/ui/StatusPedido";
 import { AvisoBase } from "../produtos/AvisoBase";
 import { avaliarBase, formatarData } from "../produtos/statusBase";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
+import { CHANGELOG, VERSAO_APP } from "../../versaoApp";
 import css from "./home.module.css";
 
 export function HomePage() {
   const repo = useRepository();
   const navigate = useNavigate();
+  const [novidadesAberto, setNovidadesAberto] = useState(false);
 
   const { dados } = useDados(
     async () => ({
@@ -92,7 +95,36 @@ export function HomePage() {
             })}
           </div>
         )}
+
+        <div className={css.rodape}>
+          <span>v{VERSAO_APP}</span>
+          <button
+            type="button"
+            className={css.botaoNovidades}
+            aria-label="Novidades desta versão"
+            onClick={() => setNovidadesAberto(true)}
+          >
+            ⓘ
+          </button>
+        </div>
       </main>
+
+      <Sheet titulo="Novidades" aberto={novidadesAberto} aoFechar={() => setNovidadesAberto(false)}>
+        <div className="pilha">
+          {CHANGELOG.map((entrada) => (
+            <div key={entrada.versao}>
+              <div className="texto-forte">
+                v{entrada.versao} · {formatarData(entrada.data)}
+              </div>
+              <ul className={css.listaNovidades}>
+                {entrada.itens.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 }

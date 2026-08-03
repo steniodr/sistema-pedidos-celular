@@ -1,4 +1,7 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useToast } from "./components/ui/Toast";
+import { aoAtualizarDisponivel, aplicarAtualizacao, haAtualizacaoDisponivel } from "./pwa";
 import { HomePage } from "./features/home/HomePage";
 import { ClientesPage } from "./features/clientes/ClientesPage";
 import { ClienteFormPage } from "./features/clientes/ClienteFormPage";
@@ -16,6 +19,18 @@ import { RelatoriosPage } from "./features/relatorios/RelatoriosPage";
 import { ConfigPage } from "./features/config/ConfigPage";
 
 export function App() {
+  const toast = useToast();
+
+  useEffect(() => {
+    function avisar() {
+      toast.acao("Nova versão do app disponível.", "Atualizar agora", () => {
+        void aplicarAtualizacao();
+      });
+    }
+    if (haAtualizacaoDisponivel()) avisar();
+    return aoAtualizarDisponivel(avisar);
+  }, [toast]);
+
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />

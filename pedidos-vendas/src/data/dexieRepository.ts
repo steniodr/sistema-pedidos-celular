@@ -22,6 +22,12 @@ import type {
 const CHAVE_IMPORTACAO = "ultimaImportacao";
 const CHAVE_REPRESENTANTE = "representante";
 
+/** "HH:mm" local a partir de um ISO — usado como horário padrão do pedido. */
+function horaDeIso(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 /** Campos de texto não vazios da entrada — usado para mesclar sem apagar dados existentes. */
 function camposPreenchidos(entrada: EntradaCliente): Partial<Cliente> {
   const preenchido: Record<string, unknown> = {};
@@ -255,6 +261,7 @@ export const dexieRepository: Repository = {
       marca,
       clienteId,
       dataPedido: momento.slice(0, 10),
+      horaPedido: horaDeIso(momento),
       representanteNome: representante?.nome,
       representanteTelefone: representante?.telefone,
       representanteEmail: representante?.email,
@@ -280,6 +287,7 @@ export const dexieRepository: Repository = {
       id: novoId(),
       numero: await this.proximoNumeroPedido(),
       dataPedido: momento.slice(0, 10),
+      horaPedido: horaDeIso(momento),
       status: "rascunho",
       itens: original.itens.map((item) => ({ ...item })),
       criadoEm: momento,

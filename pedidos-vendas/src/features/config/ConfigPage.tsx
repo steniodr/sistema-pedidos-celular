@@ -13,6 +13,8 @@ import { semearClientesTeste } from "../clientes/clientesTeste";
 import { gerarPedidosTeste } from "../pedidos/pedidosTeste";
 import { avaliarBase, formatarDataHora } from "../produtos/statusBase";
 import { baixarArquivo } from "../export/dadosExportacao";
+import { verificarAtualizacoesAgora } from "../../pwa";
+import { VERSAO_APP } from "../../versaoApp";
 
 const VAZIO: Representante = { nome: "", telefone: "", email: "" };
 
@@ -25,6 +27,7 @@ export function ConfigPage() {
   const [semeandoPedidos, setSemeandoPedidos] = useState(false);
   const [gerandoBackup, setGerandoBackup] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
+  const [verificando, setVerificando] = useState(false);
   const inputBackup = useRef<HTMLInputElement>(null);
 
   const { dados: salvo } = useDados(() => repo.obterRepresentante(), [repo]);
@@ -115,8 +118,32 @@ export function ConfigPage() {
     }
   }
 
+  async function verificarAtualizacoes() {
+    setVerificando(true);
+    try {
+      const atualizou = await verificarAtualizacoesAgora();
+      // Se atualizou, a página recarrega sozinha na versão nova — não sobra
+      // tempo pra esse toast aparecer, mas não custa nada deixá-lo aqui.
+      if (!atualizou) toast.info(`Você já está na versão mais recente (v${VERSAO_APP}).`);
+    } catch (e) {
+      toast.erro(mensagemErro(e, "Não foi possível verificar atualizações."));
+    } finally {
+      setVerificando(false);
+    }
+  }
+
   return (
     <Tela titulo="Configurações" voltar="/" comBarraInferior>
+      <h2 className="secao-titulo">App</h2>
+      <p className="texto-suave">
+        Versão v{VERSAO_APP}. O app instalado na tela inicial às vezes demora
+        pra pegar uma atualização sozinho — use o botão abaixo pra forçar a
+        checagem agora, sem precisar apagar e reinstalar.
+      </p>
+      <Button variante="secundario" onClick={verificarAtualizacoes} disabled={verificando}>
+        {verificando ? "Verificando…" : "Verificar atualizações"}
+      </Button>
+
       <h2 className="secao-titulo">Representante</h2>
       <p className="texto-suave">
         Preenchido automaticamente no rodapé de todo pedido novo.

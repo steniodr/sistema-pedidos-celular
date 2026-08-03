@@ -9,6 +9,7 @@ import {
   intervaloPeriodo,
   produtosMaisVendidos,
   resumoVendas,
+  type OrdemValor,
   type Periodo,
 } from "../../domain/relatorios";
 import css from "./relatorios.module.css";
@@ -22,11 +23,19 @@ const ROTULOS_PERIODO: Record<Periodo, string> = {
 const TODAS_MARCAS = "Todas";
 const TODOS_CLIENTES = "";
 
+const ORDENS_VALOR = ["Maior valor", "Menor valor"] as const;
+type RotuloOrdem = (typeof ORDENS_VALOR)[number];
+const ORDEM_POR_ROTULO: Record<RotuloOrdem, OrdemValor> = {
+  "Maior valor": "desc",
+  "Menor valor": "asc",
+};
+
 export function RelatoriosPage() {
   const repo = useRepository();
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [marcaFiltro, setMarcaFiltro] = useState(TODAS_MARCAS);
   const [clienteFiltro, setClienteFiltro] = useState(TODOS_CLIENTES);
+  const [rotuloOrdem, setRotuloOrdem] = useState<RotuloOrdem>("Maior valor");
 
   const { dados: contexto } = useDados(async () => {
     const [enviados, clientes] = await Promise.all([
@@ -54,8 +63,8 @@ export function RelatoriosPage() {
   }, [contexto, inicio, fim, marcaFiltro, clienteFiltro]);
 
   const resumo = resumoVendas(filtrados);
-  const maisVendidos = produtosMaisVendidos(filtrados);
-  const maiorValor = maisVendidos[0]?.valorTotal ?? 0;
+  const maisVendidos = produtosMaisVendidos(filtrados, 10, ORDEM_POR_ROTULO[rotuloOrdem]);
+  const maiorValor = Math.max(0, ...maisVendidos.map((p) => p.valorTotal));
 
   const opcoesMarca = [TODAS_MARCAS, ...(contexto?.marcas ?? [])];
 
@@ -113,7 +122,10 @@ export function RelatoriosPage() {
             </div>
           </Cartao>
 
-          <h2 className="secao-titulo">Produtos mais vendidos</h2>
+          <div className="linha linha--entre">
+            <h2 className="secao-titulo">Produtos mais vendidos</h2>
+            <Chips opcoes={ORDENS_VALOR} valor={rotuloOrdem} onChange={setRotuloOrdem} />
+          </div>
           <Cartao>
             {maisVendidos.map((p) => (
               <div key={p.nome} className={css.barraLinha}>

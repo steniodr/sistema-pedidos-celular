@@ -116,6 +116,21 @@ describe("produtosMaisVendidos", () => {
     ]);
   });
 
+  it("ordena por menor valor quando pedido explicitamente", () => {
+    const pedidos = [
+      pedido({
+        itens: [
+          item({ nomeProduto: "Esmalte", qtd: 2, valorUnit: 50 }), // 100
+          item({ nomeProduto: "Verniz", qtd: 1, valorUnit: 500 }), // 500
+        ],
+      }),
+    ];
+    expect(produtosMaisVendidos(pedidos, 10, "asc")).toEqual([
+      { nome: "Esmalte", quantidade: 2, valorTotal: 100 },
+      { nome: "Verniz", quantidade: 1, valorTotal: 500 },
+    ]);
+  });
+
   it("usa descricaoProduto quando não há nomeProduto separado", () => {
     const pedidos = [pedido({ itens: [item({ descricaoProduto: "Item avulso" })] })];
     expect(produtosMaisVendidos(pedidos)).toEqual([

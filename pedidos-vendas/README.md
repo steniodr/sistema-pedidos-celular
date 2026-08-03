@@ -25,6 +25,8 @@ src/
   db/          schema do Dexie (IndexedDB), com migração de versão
   data/        interface Repository + implementação Dexie + provider React
   components/  kit de UI (botão, campo, select+outro, cartão, chips, sheet, toast, status)
+  pwa.ts       registro do service worker, checagem periódica de atualização
+  versaoApp.ts número da versão exibida na Home + changelog
   features/
     home/        tela inicial — atalhos, indicador de base, pedidos recentes
     clientes/    lista, cadastro/edição, clientes de teste, importação em lote
@@ -46,6 +48,8 @@ src/
 | Detecção de coluna por planilha (compartilhada entre os dois importadores acima) | `src/domain/planilha.ts` |
 | Listas fixas (condição de pagamento, forma de solicitação) | `src/domain/condicoesPagamento.ts`, `src/domain/formasSolicitacao.ts` |
 | Métricas do relatório de vendas | `src/domain/relatorios.ts` — funções puras, sem I/O |
+| Lista simples do histórico (PDF/texto, agrupada por data) | `src/features/pedidos/exportarHistorico.ts` |
+| Número da versão e changelog exibidos na Tela Inicial | `src/versaoApp.ts` — atualizar à mão a cada release |
 | Sincronização futura (Supabase) | implementar `Repository` em `src/data/` e trocar no `RepositoryProvider` |
 
 ### Importação da base de produtos
@@ -108,6 +112,19 @@ Os arquivos exportados (Excel e PDF) mostram só o **nome** do produto, sem a
 variante/detalhes — esses ficam visíveis dentro do app (tela do pedido, resumo)
 mas não vazam para o arquivo final.
 
+### Atualização do service worker (PWA)
+
+O app instalado na tela inicial costuma ficar aberto muito tempo sem uma
+navegação de verdade, e o navegador só checa atualização do service worker em
+certas navegações — então o modo `autoUpdate` do vite-plugin-pwa às vezes
+nunca chegava a aplicar a versão nova (só resolvia apagando e reinstalando o
+app). Por isso `registerType` é `"prompt"` e o registro é feito à mão em
+`src/pwa.ts`, com três mecanismos: checagem periódica (a cada 1h) enquanto o
+app está aberto, um toast "Atualizar agora" quando uma versão nova é
+detectada, e um botão "Verificar atualizações" em Configurações que força a
+checagem e aplica na hora. `injectRegister: false` em `vite.config.ts` porque
+o registro não é mais o script injetado automaticamente pelo plugin.
+
 ## Estado atual
 
 Fases 1 e 2 da especificação original estão implementadas, mais uma rodada
@@ -115,40 +132,62 @@ extensa de ajustes pedidos após uso real do app:
 
 **Clientes** — cadastro com validação de CPF/CNPJ (bloqueia finalizar pedido, não
 bloqueia rascunho), condição de pagamento como lista fixa (42 opções) com opção
-"Outro", lista com ícone de edição, exclusão, clientes de teste (Configurações),
-**importação em lote por planilha** (upsert por CPF/CNPJ, ver seção acima), tag
-de situação (Ativo/Inativo/Atenção) na lista quando vem da planilha, campos
-`nomeFantasia` e `contato` no cadastro.
+"Outro", lista com ícone de edição, busca com debounce, ordenação (Nome/Recentes),
+clientes de teste (Configurações), **importação em lote por planilha** (upsert
+por CPF/CNPJ, ver seção acima), tag de situação (Ativo/Inativo/Atenção) na lista
+quando vem da planilha, campos `nomeFantasia` e `contato` no cadastro. Excluir
+avisa quantos pedidos ficam sem o nome do cliente antes de confirmar, e oferece
+"Desfazer" logo depois.
 
 **Produtos** — importação com prévia, formato matriz ou lista, base editável
-(criar/editar/excluir produto na mão, além da importação), indicador de base
-desatualizada (verde ≤30 dias, amarelo 30–90, vermelho >90 — acima de 90 dias
-exige uma confirmação extra ao finalizar o pedido, mas nunca bloqueia).
+(criar/editar/excluir produto na mão, com "Desfazer", além da importação),
+ordenação (Nome/Valor), indicador de base desatualizada (verde ≤30 dias, amarelo
+30–90, vermelho >90 — acima de 90 dias exige uma confirmação extra ao finalizar
+o pedido, mas nunca bloqueia).
 
-**Pedido** — marca em texto livre, busca de produto só por nome (com escolha de
-variante quando há mais de uma), embalagem em chips com opção "Outro", embalagem
-e valor obrigatórios, quantidade com botões −/+, desconto em % ou R$ com motivo
-opcional, forma de solicitação como lista fixa, histórico com filtro por
-marca/cliente/status, duplicar e reenviar pedido, botões "Salvar rascunho" e
-"Voltar ao início".
+**Pedido** — marca em texto livre, data **e horário** do pedido (editáveis em
+Finalizar), busca de produto só por nome (com escolha de variante quando há
+mais de uma), embalagem em chips com opção "Outro", embalagem e valor
+obrigatórios, quantidade com botões −/+, desconto em % ou R$ com motivo
+opcional, forma de solicitação como lista fixa, excluir pedido (com
+"Desfazer"), histórico com filtro por marca/cliente/status, busca com
+debounce, ordenação (Recentes/Maior valor), duplicar e reenviar pedido,
+botões "Salvar rascunho" e "Voltar ao início".
 
 **Exportação** — Excel no molde oficial (com fallback e adaptação automática de
 capacidade, ver acima) e PDF com bloco de cliente e bloco de totais estilizados
-nas cores da marca, tabela de itens com listras zebradas.
+nas cores da marca, tabela de itens com listras zebradas. Histórico exportável
+à parte: lista simples (horário, cliente, código do cliente) agrupada por data,
+em PDF ou copiada como texto simples para a área de transferência — com opção
+de incluir todos os pedidos ou só os enviados (`src/features/pedidos/exportarHistorico.ts`).
 
 **Relatórios** — tela de vendas com filtro por período (semana atual, mês atual
 ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
-ticket médio; lista de produtos mais vendidos (barras simples, sem lib de
-gráfico — ver `src/domain/relatorios.ts`). Só conta pedidos com status
-"Enviado" (rascunho não é venda fechada) e só reflete os pedidos deste
-aparelho, já que a sincronização entre vendedores ainda não existe.
+ticket médio; lista de produtos mais vendidos com toggle Maior/Menor valor
+(barras simples, sem lib de gráfico — ver `src/domain/relatorios.ts`). Só
+conta pedidos com status "Enviado" (rascunho não é venda fechada) e só
+reflete os pedidos deste aparelho, já que a sincronização entre vendedores
+ainda não existe.
+
+**Backup** — Configurações tem botões para baixar toda a base local (clientes,
+produtos, pedidos, representante) em um `.json`, e restaurar a partir de um
+arquivo desses — útil pra trocar de aparelho antes da sincronização em nuvem
+existir. Configurações também tem um gerador de pedidos de teste (datas/marcas/
+clientes variados) só pra validar a tela de Relatórios sem montar pedido na mão.
+
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.0`) com um
+ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
+sobre como o app garante que a versão instalada não fique presa numa build
+antiga.
 
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-109 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
+128 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
 molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo
-maior. Backup/exportação da base local, desfazer exclusão e outras melhorias
-menores seguem como ideias registradas, não priorizadas ainda.
+maior. Cobertura de teste de tela para o fluxo de pedido (Finalizar, exclusão)
+foi ampliada, mas ainda não é exaustiva; erros de armazenamento cheio já
+mostram mensagem própria (`src/domain/erros.ts`), aplicada nos principais
+pontos de gravação/importação, mas não em absolutamente todos.

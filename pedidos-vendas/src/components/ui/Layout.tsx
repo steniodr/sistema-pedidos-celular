@@ -13,10 +13,18 @@ export function Tela({
   /** Rota de volta; `true` usa o histórico do navegador. */
   voltar?: string | true;
   acao?: ReactNode;
-  comBarraInferior?: boolean;
+  /** `"grande"` reserva mais espaço embaixo — barra inferior com duas linhas de botão. */
+  comBarraInferior?: boolean | "grande";
   children: ReactNode;
 }) {
   const navigate = useNavigate();
+
+  const classeBarra =
+    comBarraInferior === "grande"
+      ? " app-conteudo--com-barra-grande"
+      : comBarraInferior
+        ? " app-conteudo--com-barra"
+        : "";
 
   return (
     <div className="app-shell">
@@ -34,11 +42,7 @@ export function Tela({
         <h1 className={css.barraTopoTitulo}>{titulo}</h1>
         {acao}
       </header>
-      <main
-        className={`app-conteudo${comBarraInferior ? " app-conteudo--com-barra" : ""}`}
-      >
-        {children}
-      </main>
+      <main className={`app-conteudo${classeBarra}`}>{children}</main>
     </div>
   );
 }

@@ -25,3 +25,36 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0 8px;
+  color: var(--cor-texto-suave);
+  font-size: 0.8125rem;
+}
+
+.botaoNovidades {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--cor-borda);
+  color: var(--cor-texto-suave);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.listaNovidades {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--cor-texto-suave);
+  font-size: 0.9375rem;
+}

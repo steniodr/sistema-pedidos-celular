@@ -4,7 +4,10 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { RepositoryProvider } from "./data/RepositoryContext";
 import { ToastProvider } from "./components/ui/Toast";
+import { iniciarServiceWorker } from "./pwa";
 import "./styles/global.css";
+
+iniciarServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

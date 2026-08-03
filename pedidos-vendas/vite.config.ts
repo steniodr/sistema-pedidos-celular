@@ -16,7 +16,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" em vez de "autoUpdate": o app instalado na tela inicial fica
+      // muito tempo aberto sem navegar de verdade, então a atualização
+      // silenciosa nem sempre chega a ser aplicada. Com "prompt" o app checa
+      // periodicamente (ver src/pwa.ts) e mostra um aviso com "Atualizar
+      // agora" — e Configurações ganha um botão pra forçar a checagem.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: [
         "icons/icon-192.png",
         "icons/icon-512.png",
