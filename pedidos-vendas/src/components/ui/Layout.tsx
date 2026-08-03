@@ -13,18 +13,12 @@ export function Tela({
   /** Rota de volta; `true` usa o histórico do navegador. */
   voltar?: string | true;
   acao?: ReactNode;
-  /** `"grande"` reserva mais espaço embaixo — barra inferior com duas linhas de botão. */
-  comBarraInferior?: boolean | "grande";
+  comBarraInferior?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
 
-  const classeBarra =
-    comBarraInferior === "grande"
-      ? " app-conteudo--com-barra-grande"
-      : comBarraInferior
-        ? " app-conteudo--com-barra"
-        : "";
+  const classeBarra = comBarraInferior ? " app-conteudo--com-barra" : "";
 
   return (
     <div className="app-shell">

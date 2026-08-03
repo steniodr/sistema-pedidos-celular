@@ -47,7 +47,7 @@ describe("navegação básica", () => {
   });
 
   it("abre configurações e salva o representante", async () => {
-    abrir("/config");
+    abrir("/config/representante");
     await preencher(/^Nome/, "João Vendedor");
     await preencher(/^E-mail/, "joao@exemplo.com");
     await userEvent.click(screen.getByRole("button", { name: "Salvar" }));

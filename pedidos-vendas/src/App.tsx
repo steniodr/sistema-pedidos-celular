@@ -17,6 +17,7 @@ import { FinalizarPedidoPage } from "./features/pedidos/FinalizarPedidoPage";
 import { HistoricoPage } from "./features/pedidos/HistoricoPage";
 import { RelatoriosPage } from "./features/relatorios/RelatoriosPage";
 import { ConfigPage } from "./features/config/ConfigPage";
+import { RepresentanteFormPage } from "./features/config/RepresentanteFormPage";
 
 export function App() {
   const toast = useToast();
@@ -55,6 +56,7 @@ export function App() {
       <Route path="/relatorios" element={<RelatoriosPage />} />
 
       <Route path="/config" element={<ConfigPage />} />
+      <Route path="/config/representante" element={<RepresentanteFormPage />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

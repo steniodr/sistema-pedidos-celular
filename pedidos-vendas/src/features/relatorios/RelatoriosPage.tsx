@@ -124,7 +124,22 @@ export function RelatoriosPage() {
 
           <div className="linha linha--entre">
             <h2 className="secao-titulo">Produtos mais vendidos</h2>
-            <Chips opcoes={ORDENS_VALOR} valor={rotuloOrdem} onChange={setRotuloOrdem} />
+            <div className={css.ordemValor} role="group" aria-label="Ordenar por valor">
+              {ORDENS_VALOR.map((rotulo) => (
+                <button
+                  key={rotulo}
+                  type="button"
+                  className={`${css.ordemValorBotao} ${
+                    rotulo === rotuloOrdem ? css["ordemValorBotao--ativo"] : ""
+                  }`}
+                  aria-label={rotulo}
+                  aria-pressed={rotulo === rotuloOrdem}
+                  onClick={() => setRotuloOrdem(rotulo)}
+                >
+                  {rotulo === "Maior valor" ? "$↑" : "$↓"}
+                </button>
+              ))}
+            </div>
           </div>
           <Cartao>
             {maisVendidos.map((p) => (

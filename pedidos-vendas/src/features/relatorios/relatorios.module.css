@@ -53,3 +53,31 @@
   border-radius: 999px;
   background: var(--cor-primaria);
 }
+
+.ordemValor {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ordemValorBotao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ordemValorBotao--ativo {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria);
+  color: #fff;
+}

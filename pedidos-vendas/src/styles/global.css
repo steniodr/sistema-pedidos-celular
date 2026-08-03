@@ -103,10 +103,6 @@ a {
   padding-bottom: calc(96px + var(--espaco-base));
 }
 
-.app-conteudo--com-barra-grande {
-  padding-bottom: calc(156px + var(--espaco-base));
-}
-
 .pilha {
   display: flex;
   flex-direction: column;

@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button, LinkButton } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Field";
-import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
+import { Cartao, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
-import { mascararTelefone } from "../../domain/cpfCnpj";
 import { mensagemErro } from "../../domain/erros";
-import type { Representante } from "../../domain/types";
 import type { BackupDados } from "../../data/repository";
 import { semearClientesTeste } from "../clientes/clientesTeste";
 import { gerarPedidosTeste } from "../pedidos/pedidosTeste";
@@ -16,13 +13,9 @@ import { baixarArquivo } from "../export/dadosExportacao";
 import { verificarAtualizacoesAgora } from "../../pwa";
 import { VERSAO_APP } from "../../versaoApp";
 
-const VAZIO: Representante = { nome: "", telefone: "", email: "" };
-
 export function ConfigPage() {
   const repo = useRepository();
   const toast = useToast();
-  const [form, setForm] = useState<Representante>(VAZIO);
-  const [salvando, setSalvando] = useState(false);
   const [semeando, setSemeando] = useState(false);
   const [semeandoPedidos, setSemeandoPedidos] = useState(false);
   const [gerandoBackup, setGerandoBackup] = useState(false);
@@ -30,25 +23,9 @@ export function ConfigPage() {
   const [verificando, setVerificando] = useState(false);
   const inputBackup = useRef<HTMLInputElement>(null);
 
-  const { dados: salvo } = useDados(() => repo.obterRepresentante(), [repo]);
+  const { dados: representante } = useDados(() => repo.obterRepresentante(), [repo]);
   const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
   const statusBase = avaliarBase(importacao);
-
-  useEffect(() => {
-    if (salvo) setForm(salvo);
-  }, [salvo]);
-
-  async function salvar() {
-    setSalvando(true);
-    try {
-      await repo.salvarRepresentante(form);
-      toast.sucesso("Dados do representante salvos.");
-    } catch (e) {
-      toast.erro(mensagemErro(e, "Não foi possível salvar."));
-    } finally {
-      setSalvando(false);
-    }
-  }
 
   async function criarClientesTeste() {
     setSemeando(true);
@@ -133,7 +110,7 @@ export function ConfigPage() {
   }
 
   return (
-    <Tela titulo="Configurações" voltar="/" comBarraInferior>
+    <Tela titulo="Configurações" voltar="/">
       <h2 className="secao-titulo">App</h2>
       <p className="texto-suave">
         Versão v{VERSAO_APP}. O app instalado na tela inicial às vezes demora
@@ -148,23 +125,18 @@ export function ConfigPage() {
       <p className="texto-suave">
         Preenchido automaticamente no rodapé de todo pedido novo.
       </p>
-      <Input
-        rotulo="Nome"
-        value={form.nome}
-        onChange={(e) => setForm({ ...form, nome: e.target.value })}
-      />
-      <Input
-        rotulo="Telefone"
-        inputMode="tel"
-        value={mascararTelefone(form.telefone)}
-        onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-      />
-      <Input
-        rotulo="E-mail"
-        type="email"
-        value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
-      />
+      <Cartao>
+        <p className="texto-suave">
+          {representante?.nome
+            ? [representante.nome, representante.telefone, representante.email]
+                .filter(Boolean)
+                .join(" · ")
+            : "Nenhum representante cadastrado ainda."}
+        </p>
+      </Cartao>
+      <LinkButton to="/config/representante" variante="secundario">
+        Cadastrar representante
+      </LinkButton>
 
       <h2 className="secao-titulo">Base de produtos</h2>
       <Cartao>
@@ -221,12 +193,6 @@ export function ConfigPage() {
       <Button variante="secundario" onClick={criarPedidosTeste} disabled={semeandoPedidos}>
         {semeandoPedidos ? "Criando…" : "Criar pedidos de teste"}
       </Button>
-
-      <BarraInferior>
-        <Button bloco onClick={salvar} disabled={salvando}>
-          {salvando ? "Salvando…" : "Salvar"}
-        </Button>
-      </BarraInferior>
     </Tela>
   );
 }
