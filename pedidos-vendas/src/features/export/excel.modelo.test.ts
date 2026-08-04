@@ -165,8 +165,12 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
 
   it("preenche o rodapé de 4 colunas, com o total já descontado", async () => {
     const { planilha, dados } = await abrirGerado();
-    expect(planilha.getCell("A63").value).toBe("WhatsApp");
-    expect(planilha.getCell("D63").value).toBe("30/07/2026");
+    // Linha 63 é só o rótulo (nunca sobrescrito); o valor de verdade vai na
+    // linha de baixo (64), mesma linha de Representante e Valor do pedido.
+    expect(planilha.getCell("A63").value).toBe("FORMA DE SOLICITAÇÃO");
+    expect(planilha.getCell("D63").value).toBe("DATA");
+    expect(planilha.getCell("A64").value).toBe("WhatsApp");
+    expect(planilha.getCell("D64").value).toBe("30/07/2026");
     expect(planilha.getCell("E64").value).toContain("João Vendedor");
     expect(planilha.getCell("E65").value).toBe("joao@exemplo.com");
 
@@ -213,11 +217,11 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     expect(planilha.getCell("A61").value).toBe("Subtotal");
     expect(planilha.getCell("A62").value).toBe(dados.descontoRotulo);
     expect(planilha.getCell("H62").note).toContain("Autorizado pelo gerente");
-    // O rodapé continua logo em seguida, na linha 63 — nenhuma linha extra inserida
-    // (a célula A63 já vem sobrescrita com o valor da forma de solicitação, mesmo
-    // padrão de "placeholder sobrescrito" usado nos outros campos do rodapé).
-    expect(planilha.getCell("A63").value).toBe("WhatsApp");
-    expect(planilha.getCell("D63").value).toBe(dados.dataPedido);
+    // O rodapé continua logo em seguida — rótulos na linha 63, valores na 64,
+    // nenhuma linha extra inserida.
+    expect(planilha.getCell("A63").value).toBe("FORMA DE SOLICITAÇÃO");
+    expect(planilha.getCell("A64").value).toBe("WhatsApp");
+    expect(planilha.getCell("D64").value).toBe(dados.dataPedido);
   });
 
   it("com mais produtos do que a capacidade do molde, usa o gerador alternativo em vez de arriscar duplicar linha no molde real", async () => {

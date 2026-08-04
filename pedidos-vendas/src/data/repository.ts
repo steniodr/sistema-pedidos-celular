@@ -55,6 +55,8 @@ export interface Repository {
   criarPedido(dados: NovoPedido): Promise<Pedido>;
   duplicarPedido(id: string): Promise<Pedido>;
   proximoNumeroPedido(): Promise<number>;
+  /** `true` se já existe OUTRO pedido com esse número (`excluirId` ignora o próprio pedido ao editar). */
+  existeNumeroPedido(numero: number, excluirId?: string): Promise<boolean>;
 
   // Check-in (visita ao cliente, independente de pedido)
   listarCheckIns(filtro?: FiltroCheckIns): Promise<CheckIn[]>;

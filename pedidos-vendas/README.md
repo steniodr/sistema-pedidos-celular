@@ -160,12 +160,16 @@ horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
 de produto só por nome (com escolha de variante quando há mais de uma),
 embalagem em chips com opção "Outro", embalagem e valor obrigatórios,
 quantidade com botões −/+, desconto em % ou R$ com motivo opcional. Um item
-pode ser marcado como "com desconto" (valor promocional avulso, com a
-observação pré-preenchida "Valor promocional") — esse item fica de fora do
-cálculo do desconto geral do pedido. Forma de solicitação e condição de
-pagamento como lista fixa (a condição de pagamento vem pré-preenchida do
-cadastro do cliente ao criar o pedido, editável só para aquele pedido, sem
-alterar o cadastro). Excluir pedido (com "Desfazer"), histórico com filtro por
+pode ser marcado como "com desconto" (valor promocional avulso, com o campo
+Padrão/Complemento pré-preenchido "Valor promocional", já que esse campo
+aparece no Excel/PDF) — esse item fica de fora do cálculo do desconto geral
+do pedido. Em Finalizar: número do pedido editável (com aviso se já existe
+outro pedido com o mesmo número — bloqueia a exportação até corrigir), forma
+de solicitação, condição de pagamento, transportadora e local de entrega
+como campos editáveis — os três últimos vêm pré-preenchidos do cadastro do
+cliente ao criar o pedido, com um botão "Usar do cliente" pra reaplicar se o
+cadastro mudar depois, mas editar aqui nunca altera o cadastro. Excluir
+pedido (com "Desfazer"), histórico com filtro por
 marca/cliente/status e por período (dia, semana ou mês, com calendário)
 agrupados num painel "Filtros" com contador de filtros ativos, busca com
 debounce, ordenação (Recentes/Maior valor), duplicar e reenviar pedido,
@@ -188,7 +192,8 @@ pedidos, já que o horário não depende mais de um pedido existir.
 
 **Exportação** — Excel no molde oficial (com fallback e adaptação automática de
 capacidade, ver acima) e PDF com bloco de cliente e bloco de totais estilizados
-nas cores da marca, tabela de itens com listras zebradas.
+nas cores da marca, tabela de itens com listras zebradas (incluindo a coluna
+Padrão/Complemento, igual ao Excel).
 
 **Relatórios** — tela de vendas com filtro por período (semana atual, mês atual
 ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
@@ -208,7 +213,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.2`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.4`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -216,7 +221,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-146 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
+151 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
 molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

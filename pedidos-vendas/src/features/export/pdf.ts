@@ -27,13 +27,14 @@ interface Coluna {
 }
 
 const COLUNAS: Coluna[] = [
-  { titulo: "#", x: MARGEM, largura: 8 },
-  { titulo: "Qtd", x: MARGEM + 8, largura: 12, alinhamento: "right" },
-  { titulo: "Embalagem", x: MARGEM + 22, largura: 26 },
-  { titulo: "Produto", x: MARGEM + 48, largura: 62 },
-  { titulo: "Cor", x: MARGEM + 110, largura: 26 },
-  { titulo: "Vl. Unit", x: MARGEM + 136, largura: 22, alinhamento: "right" },
-  { titulo: "Total", x: MARGEM + 158, largura: 24, alinhamento: "right" },
+  { titulo: "#", x: MARGEM, largura: 7 },
+  { titulo: "Qtd", x: MARGEM + 7, largura: 10, alinhamento: "right" },
+  { titulo: "Embalagem", x: MARGEM + 19, largura: 20 },
+  { titulo: "Produto", x: MARGEM + 41, largura: 44 },
+  { titulo: "Cor", x: MARGEM + 87, largura: 16 },
+  { titulo: "Padrão/Compl.", x: MARGEM + 105, largura: 20 },
+  { titulo: "Vl. Unit", x: MARGEM + 127, largura: 20, alinhamento: "right" },
+  { titulo: "Total", x: MARGEM + 149, largura: 22, alinhamento: "right" },
 ];
 
 export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
@@ -74,10 +75,13 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
 
+  const larguraProduto = COLUNAS[3].largura;
+  const larguraObservacao = LARGURA_A4 - MARGEM - COLUNAS[3].x - 2;
+
   dados.itens.forEach((item, indice) => {
-    const produto = doc.splitTextToSize(item.descricaoProduto, 60) as string[];
+    const produto = doc.splitTextToSize(item.descricaoProduto, larguraProduto) as string[];
     const observacao = item.descricao
-      ? (doc.splitTextToSize(item.descricao, 120) as string[])
+      ? (doc.splitTextToSize(item.descricao, larguraObservacao) as string[])
       : [];
     const alturaConteudo =
       Math.max(produto.length, 1) * 4 + (observacao.length ? 1.5 + observacao.length * 3.5 : 0);
@@ -103,6 +107,7 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
       item.embalagem,
       produto,
       item.cor,
+      item.padraoComplemento,
       formatarMoeda(item.valorUnit),
       formatarMoeda(item.total),
     ];

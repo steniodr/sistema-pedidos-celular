@@ -133,14 +133,36 @@ describe("dexieRepository — backup e restaurar*", () => {
     expect(pedidosRestantes[0].clienteId).toBe(real.id);
   });
 
-  it("criarPedido pré-preenche a condição de pagamento do cliente", async () => {
+  it("criarPedido pré-preenche condição de pagamento, transportadora e local de entrega do cliente", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente A",
       cpfCnpj: CPF_VALIDO,
       condicaoPagamento: "Pix",
+      transportadora: "Rodoviário Sul",
+      obsGerais: "Entregar pela manhã",
     });
     const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
     expect(pedido.condicaoPagamento).toBe("Pix");
+    expect(pedido.transportadora).toBe("Rodoviário Sul");
+    expect(pedido.localEntrega).toBe("Entregar pela manhã");
+  });
+
+  it("existeNumeroPedido detecta duplicidade, ignorando o próprio pedido ao editar", async () => {
+    const cliente = await dexieRepository.salvarCliente({ nome: "Cliente A", cpfCnpj: CPF_VALIDO });
+    const p1 = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    const p2 = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    // Só p1 tem esse número ainda — excluindo o próprio p1 da checagem, não é duplicidade.
+    expect(await dexieRepository.existeNumeroPedido(p1.numero, p1.id)).toBe(false);
+
+    // p2 passa a ter o mesmo número de p1.
+    await dexieRepository.salvarPedido({ ...p2, numero: p1.numero });
+
+    // Agora, excluindo qualquer um dos dois, ainda sobra o outro com o mesmo número.
+    expect(await dexieRepository.existeNumeroPedido(p1.numero, p1.id)).toBe(true);
+    expect(await dexieRepository.existeNumeroPedido(p1.numero, p2.id)).toBe(true);
+    // Sem excluir ninguém, qualquer pedido com esse número já conta.
+    expect(await dexieRepository.existeNumeroPedido(p1.numero)).toBe(true);
   });
 
   it("restaurarCliente/restaurarProduto recolocam o registro exatamente como estava", async () => {

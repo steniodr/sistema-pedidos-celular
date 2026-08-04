@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.2";
+export const VERSAO_APP = "1.4";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,27 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.4",
+    data: "2026-08-04",
+    itens: [
+      "Exportar PDF: coluna \"Padrão/Compl.\" na tabela de itens, igual ao Excel — antes só saía no Excel",
+    ],
+  },
+  {
+    versao: "1.3",
+    data: "2026-08-04",
+    itens: [
+      "Finalizar pedido: número do pedido editável, com aviso se já existe outro pedido com o mesmo número",
+      "Finalizar pedido: transportadora e local de entrega vêm pré-preenchidos do cadastro do cliente e podem ser editados só para aquele pedido",
+      "Item com desconto: a descrição \"Valor promocional\" agora vai no campo Padrão/Complemento (aparece no Excel/PDF), não mais numa observação que ficava só como comentário invisível na planilha",
+      "Telefone do representante em Finalizar pedido agora aparece com a máscara (xx) xxxxx-xxxx / (xx) xxxx-xxxx, como nos outros cadastros",
+      "Excel: corrigido bug que sobrescrevia os rótulos \"FORMA DE SOLICITAÇÃO\" e \"DATA\" do rodapé — o valor agora vai na célula certa, uma linha abaixo",
+      "Excel: corrigido travamento ao exportar pedidos com 3 ou mais itens (fórmula compartilhada do molde quebrava a geração do arquivo)",
+      "Check-in: campo de Data (além do horário), editável, padrão o dia atual — permite registrar uma visita retroativa",
+      "Atalho \"Check-in\" na Tela Inicial agora é um botão do mesmo tamanho de \"Novo pedido\"",
+    ],
+  },
   {
     versao: "1.2",
     data: "2026-08-03",

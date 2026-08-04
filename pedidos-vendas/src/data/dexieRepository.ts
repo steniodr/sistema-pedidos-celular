@@ -250,6 +250,11 @@ export const dexieRepository: Repository = {
     return (ultimo?.numero ?? 0) + 1;
   },
 
+  async existeNumeroPedido(numero, excluirId) {
+    const iguais = await db.pedidos.where("numero").equals(numero).toArray();
+    return iguais.some((p) => p.id !== excluirId);
+  },
+
   async criarPedido({ clienteId, marca }: NovoPedido) {
     const [representante, cliente] = await Promise.all([
       this.obterRepresentante(),
@@ -267,6 +272,8 @@ export const dexieRepository: Repository = {
       representanteEmail: representante?.email,
       formaSolicitacao: "",
       condicaoPagamento: cliente?.condicaoPagamento,
+      transportadora: cliente?.transportadora,
+      localEntrega: cliente?.obsGerais,
       itens: [],
       descontoTipo: "percentual",
       descontoValor: 0,

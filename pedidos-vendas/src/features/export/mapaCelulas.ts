@@ -11,10 +11,9 @@ import type { DadosExportacao } from "./dadosExportacao";
  * ExcelJS, mas redireciona silenciosamente o valor para a célula mestre errada
  * (foi a causa do Excel "sair vazio" na primeira versão deste mapeamento).
  *
- * Colunas de condição de pagamento (F7) e representante reaproveitam a própria
- * célula do rótulo — no arquivo original elas funcionam como placeholder/dropdown
- * que é sobrescrito ao preencher, então não há uma célula de valor separada para
- * esses três campos.
+ * Coluna de condição de pagamento (F7) reaproveita a própria célula do rótulo —
+ * no arquivo original ela funciona como placeholder/dropdown que é sobrescrito
+ * ao preencher, então não há uma célula de valor separada pra esse campo.
  *
  * A fórmula original de "VALOR DO PEDIDO" soma os totais das linhas (incluindo as
  * próprias linhas de Subtotal/Desconto — um jeito estranho de somar que o molde já
@@ -112,13 +111,12 @@ export const MAPA_PADRAO: MapaModelo = {
     colunaValorFim: "H",
   },
   // Linha do rótulo = linhaDesconto + 1 (FORMA DE SOLICITAÇÃO/DATA/REPRESENTANTE/
-  // VALOR DO PEDIDO). Forma de solicitação e Data reaproveitam a própria célula do
-  // rótulo (deltaLinha 1, mesmo padrão de placeholder-sobrescrito de F7); só
-  // Representante e Valor do pedido têm célula de valor de verdade, na linha de
-  // baixo (deltaLinha 2) — e-mail do representante fica ainda uma linha abaixo (3).
+  // VALOR DO PEDIDO) — nunca sobrescrita, o molde tem uma célula de valor de
+  // verdade pra cada uma na linha de baixo (deltaLinha 2); e-mail do
+  // representante fica ainda uma linha abaixo (3).
   rodape: [
-    { coluna: "A", deltaLinha: 1, resolver: (d) => d.formaSolicitacao },
-    { coluna: "D", deltaLinha: 1, resolver: (d) => d.dataPedido },
+    { coluna: "A", deltaLinha: 2, resolver: (d) => d.formaSolicitacao },
+    { coluna: "D", deltaLinha: 2, resolver: (d) => d.dataPedido },
     {
       coluna: "E",
       deltaLinha: 2,

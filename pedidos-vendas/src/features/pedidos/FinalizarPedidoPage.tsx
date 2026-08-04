@@ -33,6 +33,10 @@ export function FinalizarPedidoPage() {
   const [temModelo, setTemModelo] = useState<boolean | null>(null);
   const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
   const statusBase = avaliarBase(importacao);
+  const { dados: numeroDuplicado } = useDados(
+    () => (pedido ? repo.existeNumeroPedido(pedido.numero, pedido.id) : Promise.resolve(false)),
+    [repo, pedido?.numero, pedido?.id],
+  );
 
   useEffect(() => {
     void modeloDisponivel().then(setTemModelo);
@@ -63,6 +67,9 @@ export function FinalizarPedidoPage() {
     }
   }
   if (pedido.itens.length === 0) pendencias.push("O pedido não tem itens.");
+  if (numeroDuplicado) {
+    pendencias.push(`Já existe outro pedido com o número ${pedido.numero} — altere antes de exportar.`);
+  }
 
   const totais = totaisPedido(pedido);
   const podeExportar = pendencias.length === 0;
@@ -118,6 +125,14 @@ export function FinalizarPedidoPage() {
     await atualizar({ condicaoPagamento: cliente?.condicaoPagamento ?? "" });
   }
 
+  async function usarTransportadoraDoCliente() {
+    await atualizar({ transportadora: cliente?.transportadora ?? "" });
+  }
+
+  async function usarLocalEntregaDoCliente() {
+    await atualizar({ localEntrega: cliente?.obsGerais ?? "" });
+  }
+
   async function usarRepresentanteSalvo() {
     const representante = await repo.obterRepresentante();
     if (!representante) {
@@ -157,6 +172,15 @@ export function FinalizarPedidoPage() {
 
       <h2 className="secao-titulo">Dados do pedido</h2>
       <Input
+        rotulo="Número do pedido"
+        obrigatorio
+        inputMode="numeric"
+        type="number"
+        erro={numeroDuplicado ? "Já existe outro pedido com esse número." : undefined}
+        value={pedido.numero}
+        onChange={(e) => atualizar({ numero: Number(e.target.value) || 0 })}
+      />
+      <Input
         rotulo="Data do pedido"
         type="date"
         value={pedido.dataPedido}
@@ -177,6 +201,26 @@ export function FinalizarPedidoPage() {
       {cliente?.condicaoPagamento && cliente.condicaoPagamento !== pedido.condicaoPagamento && (
         <Button variante="fantasma" onClick={usarCondicaoPagamentoDoCliente}>
           Usar do cliente ({cliente.condicaoPagamento})
+        </Button>
+      )}
+      <Input
+        rotulo="Transportadora"
+        value={pedido.transportadora ?? ""}
+        onChange={(e) => atualizar({ transportadora: e.target.value })}
+      />
+      {cliente?.transportadora && cliente.transportadora !== pedido.transportadora && (
+        <Button variante="fantasma" onClick={usarTransportadoraDoCliente}>
+          Usar do cliente ({cliente.transportadora})
+        </Button>
+      )}
+      <Input
+        rotulo="Local de entrega"
+        value={pedido.localEntrega ?? ""}
+        onChange={(e) => atualizar({ localEntrega: e.target.value })}
+      />
+      {cliente?.obsGerais && cliente.obsGerais !== pedido.localEntrega && (
+        <Button variante="fantasma" onClick={usarLocalEntregaDoCliente}>
+          Usar do cliente ({cliente.obsGerais})
         </Button>
       )}
 

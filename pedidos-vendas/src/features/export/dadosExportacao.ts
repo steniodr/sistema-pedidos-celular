@@ -64,9 +64,9 @@ export function montarDadosExportacao(
       bairro: cliente?.bairro ?? "",
       cidadeEstado: cliente?.cidadeEstado ?? "",
       cep: cliente?.cep ? mascararCep(cliente.cep) : "",
-      transportadora: cliente?.transportadora ?? "",
+      transportadora: pedido.transportadora ?? cliente?.transportadora ?? "",
       condicaoPagamento: pedido.condicaoPagamento ?? cliente?.condicaoPagamento ?? "",
-      obsGerais: cliente?.obsGerais ?? "",
+      obsGerais: pedido.localEntrega ?? cliente?.obsGerais ?? "",
     },
     representante: {
       nome: pedido.representanteNome ?? "",

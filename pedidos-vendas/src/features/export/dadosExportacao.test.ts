@@ -87,6 +87,41 @@ describe("montarDadosExportacao — condição de pagamento", () => {
   });
 });
 
+describe("montarDadosExportacao — transportadora e local de entrega", () => {
+  it("usa a transportadora e o local de entrega do cliente quando o pedido não tem os próprios", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(pedido, {
+      ...cliente,
+      transportadora: "Rodoviário Sul",
+      obsGerais: "Entregar pela manhã",
+    });
+    expect(dados.cliente.transportadora).toBe("Rodoviário Sul");
+    expect(dados.cliente.obsGerais).toBe("Entregar pela manhã");
+  });
+
+  it("prioriza a transportadora e o local de entrega editados no pedido sobre os do cadastro do cliente", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(
+      { ...pedido, transportadora: "FOB - Transportadora", localEntrega: "Depósito central" },
+      { ...cliente, transportadora: "Rodoviário Sul", obsGerais: "Entregar pela manhã" },
+    );
+    expect(dados.cliente.transportadora).toBe("FOB - Transportadora");
+    expect(dados.cliente.obsGerais).toBe("Depósito central");
+  });
+});
+
 describe("nomeArquivo", () => {
   it("continua funcionando normalmente", () => {
     const pedido = pedidoComItem({

@@ -95,6 +95,19 @@ describe("gerarPdf", () => {
     expect(blob.size).toBeGreaterThan(0);
   });
 
+  it("gera com padrão/complemento preenchido, inclusive com texto longo", async () => {
+    const itens: ItemPedido[] = [
+      {
+        ...doisItens[0],
+        padraoComplemento: "Padrão fosco, exceto amarelo, laranja e vermelho — conferir com o cliente",
+      },
+      doisItens[1],
+    ];
+    const dados = montarDadosExportacao(pedidoBase(itens), cliente);
+    const blob = await gerarPdf(dados);
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
   it("gera com motivo do desconto preenchido", async () => {
     const dados = montarDadosExportacao(
       { ...pedidoBase(doisItens), descontoDescricao: "Autorizado pelo gerente" },

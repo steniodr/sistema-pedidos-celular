@@ -76,8 +76,10 @@ export interface Pedido {
   representanteTelefone?: string;
   representanteEmail?: string;
   formaSolicitacao?: string;
-  /** Pré-preenchida do cadastro do cliente ao criar o pedido; editável, não altera o cadastro. */
+  /** Pré-preenchidos do cadastro do cliente ao criar o pedido; editáveis, não alteram o cadastro. */
   condicaoPagamento?: string;
+  transportadora?: string;
+  localEntrega?: string;
   itens: ItemPedido[];
   descontoTipo: DescontoTipo;
   descontoValor: number;
