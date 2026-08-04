@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.4";
+export const VERSAO_APP = "1.5";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,13 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.5",
+    data: "2026-08-04",
+    itens: [
+      "Exportar PDF: corrigido texto de Cor/Padrão-Complemento (e qualquer outro campo) vazando por cima da coluna vizinha quando muito longo — agora quebra em até 2 linhas e corta com \"...\" se ainda não couber",
+    ],
+  },
   {
     versao: "1.4",
     data: "2026-08-04",

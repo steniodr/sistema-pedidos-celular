@@ -26,6 +26,23 @@ interface Coluna {
   alinhamento?: "left" | "right";
 }
 
+/**
+ * Quebra o texto pra caber em `largura` (mm), no máximo `maxLinhas` linhas — se
+ * ainda sobrar depois disso, corta e acrescenta "..." (sem estourar a largura),
+ * pra nunca vazar por cima da coluna vizinha.
+ */
+export function celulaLimitada(doc: jsPDF, texto: string, largura: number, maxLinhas = 2): string[] {
+  if (!texto) return [""];
+  const linhas = doc.splitTextToSize(texto, largura) as string[];
+  if (linhas.length <= maxLinhas) return linhas;
+
+  let ultima = linhas[maxLinhas - 1];
+  while (ultima.length > 0 && doc.getTextWidth(`${ultima}...`) > largura) {
+    ultima = ultima.slice(0, -1);
+  }
+  return [...linhas.slice(0, maxLinhas - 1), `${ultima.trimEnd()}...`];
+}
+
 const COLUNAS: Coluna[] = [
   { titulo: "#", x: MARGEM, largura: 7 },
   { titulo: "Qtd", x: MARGEM + 7, largura: 10, alinhamento: "right" },
@@ -75,16 +92,29 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
 
-  const larguraProduto = COLUNAS[3].largura;
   const larguraObservacao = LARGURA_A4 - MARGEM - COLUNAS[3].x - 2;
 
   dados.itens.forEach((item, indice) => {
-    const produto = doc.splitTextToSize(item.descricaoProduto, larguraProduto) as string[];
+    const valoresColunas = [
+      String(item.item),
+      String(item.qtd),
+      item.embalagem,
+      item.descricaoProduto,
+      item.cor,
+      item.padraoComplemento,
+      formatarMoeda(item.valorUnit),
+      formatarMoeda(item.total),
+    ];
+    // Cada coluna quebra dentro da própria largura (no máximo 2 linhas, com
+    // "..." se ainda sobrar) — nenhum campo vaza por cima do vizinho.
+    const celulas = COLUNAS.map((coluna, i) => celulaLimitada(doc, valoresColunas[i], coluna.largura));
+    const linhasPorColuna = Math.max(1, ...celulas.map((c) => c.length));
+
     const observacao = item.descricao
       ? (doc.splitTextToSize(item.descricao, larguraObservacao) as string[])
       : [];
     const alturaConteudo =
-      Math.max(produto.length, 1) * 4 + (observacao.length ? 1.5 + observacao.length * 3.5 : 0);
+      linhasPorColuna * 4 + (observacao.length ? 1.5 + observacao.length * 3.5 : 0);
     const alturaLinha = alturaConteudo + 6;
 
     if (y + alturaLinha > LIMITE_RODAPE) {
@@ -101,26 +131,14 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
       doc.rect(MARGEM, y - 3, LARGURA_A4 - 2 * MARGEM, alturaConteudo + 3, "F");
     }
 
-    const celulas = [
-      String(item.item),
-      String(item.qtd),
-      item.embalagem,
-      produto,
-      item.cor,
-      item.padraoComplemento,
-      formatarMoeda(item.valorUnit),
-      formatarMoeda(item.total),
-    ];
-
     COLUNAS.forEach((coluna, i) => {
-      const conteudo = celulas[i];
       const x = coluna.alinhamento === "right" ? coluna.x + coluna.largura : coluna.x;
-      doc.text(conteudo as string | string[], x, y, {
+      doc.text(celulas[i], x, y, {
         align: coluna.alinhamento ?? "left",
       });
     });
 
-    y += Math.max(produto.length, 1) * 4;
+    y += linhasPorColuna * 4;
 
     if (observacao.length) {
       y += 1.5;

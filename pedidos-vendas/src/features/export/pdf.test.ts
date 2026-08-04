@@ -1,5 +1,6 @@
+import { jsPDF } from "jspdf";
 import { describe, expect, it } from "vitest";
-import { gerarPdf } from "./pdf";
+import { celulaLimitada, gerarPdf } from "./pdf";
 import { montarDadosExportacao } from "./dadosExportacao";
 import type { Cliente, ItemPedido, Pedido } from "../../domain/types";
 
@@ -61,6 +62,38 @@ const doisItens: ItemPedido[] = [
     valorUnit: 639.83,
   },
 ];
+
+describe("celulaLimitada", () => {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+
+  it("não quebra texto que já cabe na largura", () => {
+    expect(celulaLimitada(doc, "Branco", 20)).toEqual(["Branco"]);
+  });
+
+  it("string vazia vira uma linha em branco, sem lançar exceção", () => {
+    expect(celulaLimitada(doc, "", 20)).toEqual([""]);
+  });
+
+  it("quebra em até 2 linhas quando cabe em duas", () => {
+    const linhas = celulaLimitada(doc, "Branco neve Arara Azul", 20);
+    expect(linhas.length).toBeLessThanOrEqual(2);
+    expect(linhas.join(" ")).not.toContain("...");
+  });
+
+  it("corta com '...' quando o texto não cabe nem em 2 linhas, sem estourar a largura", () => {
+    const textoLongo =
+      "Branco neve Arara Azul Valor promocional conferir cor exata com o cliente antes de aplicar";
+    const linhas = celulaLimitada(doc, textoLongo, 20);
+    expect(linhas).toHaveLength(2);
+    expect(linhas[1].endsWith("...")).toBe(true);
+    // A própria função garante isso, mas confirmamos que a linha cortada
+    // realmente cabe na largura da coluna (o motivo de existir).
+    expect(doc.getTextWidth(linhas[0])).toBeLessThanOrEqual(20);
+    expect(doc.getTextWidth(linhas[1])).toBeLessThanOrEqual(20);
+  });
+});
 
 describe("gerarPdf", () => {
   it("gera um PDF válido sem lançar exceção", async () => {

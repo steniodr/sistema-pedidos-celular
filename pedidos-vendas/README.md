@@ -213,7 +213,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.4`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.5`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -221,7 +221,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-151 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
+155 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
 molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo
