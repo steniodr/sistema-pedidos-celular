@@ -83,7 +83,9 @@ export function NovoPedidoPage() {
       {cliente ? (
         <Cartao
           onClick={() =>
-            navigate(`/clientes?selecionar=1&marca=${encodeURIComponent(marca)}`)
+            navigate(
+              `/clientes?selecionar=1&retorno=${encodeURIComponent(`/pedidos/novo?marca=${encodeURIComponent(marca)}`)}`,
+            )
           }
         >
           <div className="texto-forte">{cliente.nome}</div>
@@ -98,7 +100,9 @@ export function NovoPedidoPage() {
           variante="secundario"
           bloco
           onClick={() =>
-            navigate(`/clientes?selecionar=1&marca=${encodeURIComponent(marca)}`)
+            navigate(
+              `/clientes?selecionar=1&retorno=${encodeURIComponent(`/pedidos/novo?marca=${encodeURIComponent(marca)}`)}`,
+            )
           }
         >
           Escolher cliente

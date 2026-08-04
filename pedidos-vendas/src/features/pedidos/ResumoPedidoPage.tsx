@@ -53,6 +53,7 @@ export function ResumoPedidoPage() {
                   {" "}
                   ({item.qtd} × {formatarMoeda(item.valorUnit)})
                 </span>
+                {item.comDesconto && <span className={css.tagPromocional}>Promocional</span>}
               </span>
               <span>{formatarMoeda(totalItem(item))}</span>
             </div>

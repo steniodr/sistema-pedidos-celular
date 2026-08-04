@@ -1,5 +1,6 @@
 import { agora, db, novoId } from "../db/schema";
 import type {
+  CheckIn,
   Cliente,
   ImportacaoInfo,
   Pedido,
@@ -10,9 +11,11 @@ import { somenteDigitos } from "../domain/cpfCnpj";
 import { normalizar } from "../domain/texto";
 import type {
   BackupDados,
+  EntradaCheckIn,
   EntradaCliente,
   EntradaProduto,
   EntradaProdutoUnico,
+  FiltroCheckIns,
   FiltroPedidos,
   ImportacaoClientesInfo,
   NovoPedido,
@@ -22,12 +25,6 @@ import type {
 
 const CHAVE_IMPORTACAO = "ultimaImportacao";
 const CHAVE_REPRESENTANTE = "representante";
-
-/** "HH:mm" local a partir de um ISO — usado como horário padrão do pedido. */
-function horaDeIso(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 
 /** Campos de texto não vazios da entrada — usado para mesclar sem apagar dados existentes. */
 function camposPreenchidos(entrada: EntradaCliente): Partial<Cliente> {
@@ -254,7 +251,10 @@ export const dexieRepository: Repository = {
   },
 
   async criarPedido({ clienteId, marca }: NovoPedido) {
-    const representante = await this.obterRepresentante();
+    const [representante, cliente] = await Promise.all([
+      this.obterRepresentante(),
+      db.clientes.get(clienteId),
+    ]);
     const momento = agora();
     const pedido: Pedido = {
       id: novoId(),
@@ -262,11 +262,11 @@ export const dexieRepository: Repository = {
       marca,
       clienteId,
       dataPedido: momento.slice(0, 10),
-      horaPedido: horaDeIso(momento),
       representanteNome: representante?.nome,
       representanteTelefone: representante?.telefone,
       representanteEmail: representante?.email,
       formaSolicitacao: "",
+      condicaoPagamento: cliente?.condicaoPagamento,
       itens: [],
       descontoTipo: "percentual",
       descontoValor: 0,
@@ -288,7 +288,6 @@ export const dexieRepository: Repository = {
       id: novoId(),
       numero: await this.proximoNumeroPedido(),
       dataPedido: momento.slice(0, 10),
-      horaPedido: horaDeIso(momento),
       status: "rascunho",
       itens: original.itens.map((item) => ({ ...item })),
       criadoEm: momento,
@@ -296,6 +295,43 @@ export const dexieRepository: Repository = {
     };
     await db.pedidos.add(copia);
     return copia;
+  },
+
+  async listarCheckIns(filtro: FiltroCheckIns = {}) {
+    let checkIns = await db.checkIns.orderBy("data").reverse().toArray();
+    if (filtro.clienteId) checkIns = checkIns.filter((c) => c.clienteId === filtro.clienteId);
+    if (filtro.busca?.trim()) {
+      const alvo = normalizar(filtro.busca);
+      const nomePorClienteId = new Map((await db.clientes.toArray()).map((c) => [c.id, c.nome]));
+      checkIns = checkIns.filter((c) =>
+        normalizar(nomePorClienteId.get(c.clienteId) ?? "").includes(alvo),
+      );
+    }
+    return checkIns;
+  },
+
+  async obterCheckIn(id) {
+    return db.checkIns.get(id);
+  },
+
+  async salvarCheckIn(entrada: EntradaCheckIn) {
+    const existente = entrada.id ? await db.checkIns.get(entrada.id) : undefined;
+    const checkIn: CheckIn = {
+      ...entrada,
+      id: existente?.id ?? entrada.id ?? novoId(),
+      criadoEm: existente?.criadoEm ?? agora(),
+      atualizadoEm: agora(),
+    };
+    await db.checkIns.put(checkIn);
+    return checkIn;
+  },
+
+  async removerCheckIn(id) {
+    await db.checkIns.delete(id);
+  },
+
+  async restaurarCheckIn(checkIn) {
+    await db.checkIns.put(checkIn);
   },
 
   async obterRepresentante() {
@@ -308,19 +344,22 @@ export const dexieRepository: Repository = {
   },
 
   async exportarBackup() {
-    const [clientes, produtos, pedidos, representante, ultimaImportacao] = await Promise.all([
-      db.clientes.toArray(),
-      db.produtos.toArray(),
-      db.pedidos.toArray(),
-      this.obterRepresentante(),
-      this.obterUltimaImportacao(),
-    ]);
+    const [clientes, produtos, pedidos, checkIns, representante, ultimaImportacao] =
+      await Promise.all([
+        db.clientes.toArray(),
+        db.produtos.toArray(),
+        db.pedidos.toArray(),
+        db.checkIns.toArray(),
+        this.obterRepresentante(),
+        this.obterUltimaImportacao(),
+      ]);
     const backup: BackupDados = {
       versao: 1,
       geradoEm: agora(),
       clientes,
       produtos,
       pedidos,
+      checkIns,
       representante,
       ultimaImportacao,
     };
@@ -328,20 +367,30 @@ export const dexieRepository: Repository = {
   },
 
   async restaurarBackup(dados: BackupDados) {
-    await db.transaction("rw", db.clientes, db.produtos, db.pedidos, db.meta, async () => {
-      await db.clientes.clear();
-      await db.clientes.bulkPut(dados.clientes);
-      await db.produtos.clear();
-      await db.produtos.bulkPut(dados.produtos);
-      await db.pedidos.clear();
-      await db.pedidos.bulkPut(dados.pedidos);
-      if (dados.representante) {
-        await db.meta.put({ chave: CHAVE_REPRESENTANTE, valor: dados.representante });
-      }
-      if (dados.ultimaImportacao) {
-        await db.meta.put({ chave: CHAVE_IMPORTACAO, valor: dados.ultimaImportacao });
-      }
-    });
+    await db.transaction(
+      "rw",
+      db.clientes,
+      db.produtos,
+      db.pedidos,
+      db.checkIns,
+      db.meta,
+      async () => {
+        await db.clientes.clear();
+        await db.clientes.bulkPut(dados.clientes);
+        await db.produtos.clear();
+        await db.produtos.bulkPut(dados.produtos);
+        await db.pedidos.clear();
+        await db.pedidos.bulkPut(dados.pedidos);
+        await db.checkIns.clear();
+        if (dados.checkIns) await db.checkIns.bulkPut(dados.checkIns);
+        if (dados.representante) {
+          await db.meta.put({ chave: CHAVE_REPRESENTANTE, valor: dados.representante });
+        }
+        if (dados.ultimaImportacao) {
+          await db.meta.put({ chave: CHAVE_IMPORTACAO, valor: dados.ultimaImportacao });
+        }
+      },
+    );
   },
 
   async removerDadosTeste() {

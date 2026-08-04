@@ -32,6 +32,7 @@ src/
     clientes/    lista, cadastro/edição, clientes de teste, importação em lote
     produtos/    base de preços: listagem, edição/exclusão manual, importação
     pedidos/     novo pedido, itens, resumo, finalização e histórico
+    checkin/     check-in de visita ao cliente (horário) e exportação por data
     relatorios/  vendas por período (semana/mês/tudo), cliente e marca
     export/      geração do .xlsx (molde real + gerador alternativo) e do .pdf
     config/      dados do representante, atalho de importação
@@ -48,7 +49,7 @@ src/
 | Detecção de coluna por planilha (compartilhada entre os dois importadores acima) | `src/domain/planilha.ts` |
 | Listas fixas (condição de pagamento, forma de solicitação) | `src/domain/condicoesPagamento.ts`, `src/domain/formasSolicitacao.ts` |
 | Métricas do relatório de vendas | `src/domain/relatorios.ts` — funções puras, sem I/O |
-| Lista simples do histórico (PDF/texto, agrupada por data) | `src/features/pedidos/exportarHistorico.ts` |
+| Lista simples do check-in (PDF/texto, agrupada por data) | `src/features/checkin/exportarCheckIns.ts` |
 | Número da versão e changelog exibidos na Tela Inicial | `src/versaoApp.ts` — atualizar à mão a cada release |
 | Sincronização futura (Supabase) | implementar `Repository` em `src/data/` e trocar no `RepositoryProvider` |
 
@@ -107,6 +108,14 @@ O `.xlsx` do molde fica **fora do precache do service worker** de propósito —
 só o bundle do app é precacheado. O molde é buscado com `NetworkFirst` (sempre
 tenta a rede primeiro; só usa cache quando genuinamente offline), para que
 trocar o arquivo em produção não fique preso atrás de um service worker antigo.
+Por isso `src/main.tsx` já dispara uma busca do molde assim que o app abre
+(não só na hora de exportar), pra maximizar a chance de já estar em cache
+quando o vendedor for exportar sem internet depois. Quando mesmo assim a
+exportação cai no gerador alternativo — molde indisponível ou pedido com mais
+itens do que a capacidade do molde — `gerarExcel` (`src/features/export/excel.ts`)
+devolve o motivo (`usouModelo`/`motivoFallback`) e `FinalizarPedidoPage` mostra
+um toast explicando qual dos dois casos aconteceu, em vez de só dizer "Excel
+gerado." sem indicar qual modelo foi usado.
 
 Os arquivos exportados (Excel e PDF) mostram só o **nome** do produto, sem a
 variante/detalhes — esses ficam visíveis dentro do app (tela do pedido, resumo)
@@ -146,27 +155,40 @@ ordenação (Nome/Valor), indicador de base desatualizada (verde ≤30 dias, ama
 30–90, vermelho >90 — acima de 90 dias exige uma confirmação extra ao finalizar
 o pedido, mas nunca bloqueia).
 
-**Pedido** — marca em texto livre, data **e horário** do pedido (editáveis em
-Finalizar), busca de produto só por nome (com escolha de variante quando há
-mais de uma), embalagem em chips com opção "Outro", embalagem e valor
-obrigatórios, quantidade com botões −/+, desconto em % ou R$ com motivo
-opcional, forma de solicitação como lista fixa, excluir pedido (com
-"Desfazer"), histórico com filtro por marca/cliente/status e por período
-(dia, semana ou mês, com calendário) agrupados num painel "Filtros" com
-contador de filtros ativos, busca com debounce, ordenação (Recentes/Maior
-valor), duplicar e reenviar pedido, botões "Salvar rascunho" e "Voltar ao
-início". Finalizar pedido tem os botões de exportar Excel/PDF fixos na
-parte de baixo da tela. Excluir cliente/produto/pedido, restaurar backup e
-o aviso de base de preços crítica usam um diálogo de confirmação no próprio
-visual do app (`useConfirm`, `src/components/ui/Confirm.tsx`), não mais o
-alerta nativo do navegador.
+**Pedido** — marca em texto livre e data do pedido (editável em Finalizar; o
+horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
+de produto só por nome (com escolha de variante quando há mais de uma),
+embalagem em chips com opção "Outro", embalagem e valor obrigatórios,
+quantidade com botões −/+, desconto em % ou R$ com motivo opcional. Um item
+pode ser marcado como "com desconto" (valor promocional avulso, com a
+observação pré-preenchida "Valor promocional") — esse item fica de fora do
+cálculo do desconto geral do pedido. Forma de solicitação e condição de
+pagamento como lista fixa (a condição de pagamento vem pré-preenchida do
+cadastro do cliente ao criar o pedido, editável só para aquele pedido, sem
+alterar o cadastro). Excluir pedido (com "Desfazer"), histórico com filtro por
+marca/cliente/status e por período (dia, semana ou mês, com calendário)
+agrupados num painel "Filtros" com contador de filtros ativos, busca com
+debounce, ordenação (Recentes/Maior valor), duplicar e reenviar pedido,
+botões "Salvar rascunho" e "Voltar ao início". Finalizar pedido tem os
+botões de exportar Excel/PDF fixos na parte de baixo da tela. Excluir
+cliente/produto/pedido, restaurar backup e o aviso de base de preços crítica
+usam um diálogo de confirmação no próprio visual do app (`useConfirm`,
+`src/components/ui/Confirm.tsx`), não mais o alerta nativo do navegador.
+
+**Check-in** — tela dedicada (`src/features/checkin/`) pra registrar a visita
+a um cliente, independente de existir pedido: escolhe o cliente (mesmo
+seletor usado em Novo pedido), data e horário com padrão o dia/hora atual,
+ambos editáveis (dá pra registrar uma visita retroativa). Lista com filtro
+por cliente e por período (dia/semana/mês, calendário),
+exportação à parte — lista simples (horário, cliente, código do cliente)
+agrupada por data, em PDF ou copiada como texto simples para a área de
+transferência (`src/features/checkin/exportarCheckIns.ts`) — substitui a
+exportação de "histórico de visita" que antes vivia dentro do Histórico de
+pedidos, já que o horário não depende mais de um pedido existir.
 
 **Exportação** — Excel no molde oficial (com fallback e adaptação automática de
 capacidade, ver acima) e PDF com bloco de cliente e bloco de totais estilizados
-nas cores da marca, tabela de itens com listras zebradas. Histórico exportável
-à parte: lista simples (horário, cliente, código do cliente) agrupada por data,
-em PDF ou copiada como texto simples para a área de transferência — com opção
-de incluir todos os pedidos ou só os enviados (`src/features/pedidos/exportarHistorico.ts`).
+nas cores da marca, tabela de itens com listras zebradas.
 
 **Relatórios** — tela de vendas com filtro por período (semana atual, mês atual
 ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
@@ -186,7 +208,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.1`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.2`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -194,7 +216,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-138 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
+146 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
 molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

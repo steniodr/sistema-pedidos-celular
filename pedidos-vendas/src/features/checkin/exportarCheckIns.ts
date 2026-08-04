@@ -1,35 +1,29 @@
-import type { Cliente, Pedido } from "../../domain/types";
+import type { CheckIn, Cliente } from "../../domain/types";
 import { formatarData } from "../produtos/statusBase";
 
 /**
- * Lista simples do histórico (nome do cliente, horário, código do cliente),
- * agrupada por data do pedido — pensada pra conferência/roteiro do dia, não
- * pra substituir o Excel/PDF de cada pedido individual (ver `export/pdf.ts`).
+ * Lista simples do check-in (nome do cliente, horário, código do cliente),
+ * agrupada por data — pensada pra conferência/roteiro do dia. Migrado de
+ * `src/features/pedidos/exportarHistorico.ts`: antes o horário vinha do
+ * pedido (`Pedido.horaPedido`), agora vem direto do check-in.
  */
 
-export interface LinhaHistorico {
-  dataPedido: string;
-  horaPedido: string;
+export interface LinhaCheckIn {
+  data: string;
+  hora: string;
   clienteNome: string;
   clienteCodigo: string;
 }
 
-/** Pedidos sem `horaPedido` (criados antes desse campo existir) caem no horário de criação. */
-function horaDoPedido(pedido: Pedido): string {
-  if (pedido.horaPedido) return pedido.horaPedido;
-  const d = new Date(pedido.criadoEm);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-export function montarLinhasHistorico(
-  pedidos: Pedido[],
+export function linhasDeCheckIns(
+  checkIns: CheckIn[],
   clientesPorId: Map<string, Cliente>,
-): LinhaHistorico[] {
-  return pedidos.map((pedido) => {
-    const cliente = clientesPorId.get(pedido.clienteId);
+): LinhaCheckIn[] {
+  return checkIns.map((checkIn) => {
+    const cliente = clientesPorId.get(checkIn.clienteId);
     return {
-      dataPedido: pedido.dataPedido,
-      horaPedido: horaDoPedido(pedido),
+      data: checkIn.data,
+      hora: checkIn.hora,
       clienteNome: cliente?.nome ?? "Cliente removido",
       clienteCodigo: cliente?.codigoCliente ?? "",
     };
@@ -37,39 +31,39 @@ export function montarLinhasHistorico(
 }
 
 /** Mais recente primeiro; dentro do dia, ordem cronológica (roteiro de visitas). */
-function agruparPorData(linhas: LinhaHistorico[]): Map<string, LinhaHistorico[]> {
-  const porData = new Map<string, LinhaHistorico[]>();
+function agruparPorData(linhas: LinhaCheckIn[]): Map<string, LinhaCheckIn[]> {
+  const porData = new Map<string, LinhaCheckIn[]>();
   for (const linha of linhas) {
-    const grupo = porData.get(linha.dataPedido) ?? [];
+    const grupo = porData.get(linha.data) ?? [];
     grupo.push(linha);
-    porData.set(linha.dataPedido, grupo);
+    porData.set(linha.data, grupo);
   }
   const datas = [...porData.keys()].sort((a, b) => b.localeCompare(a));
-  const ordenado = new Map<string, LinhaHistorico[]>();
+  const ordenado = new Map<string, LinhaCheckIn[]>();
   for (const data of datas) {
     ordenado.set(
       data,
-      [...porData.get(data)!].sort((a, b) => a.horaPedido.localeCompare(b.horaPedido)),
+      [...porData.get(data)!].sort((a, b) => a.hora.localeCompare(b.hora)),
     );
   }
   return ordenado;
 }
 
-/** "16/07" — dia e mês, sem ano (dataPedido é "YYYY-MM-DD"). */
-function dataCurta(dataPedido: string): string {
-  return `${dataPedido.slice(8, 10)}/${dataPedido.slice(5, 7)}`;
+/** "16/07" — dia e mês, sem ano (data é "YYYY-MM-DD"). */
+function dataCurta(data: string): string {
+  return `${data.slice(8, 10)}/${data.slice(5, 7)}`;
 }
 
 /**
  * Texto simples pra colar em outro app (ex.: WhatsApp) — mesmo agrupamento
- * do PDF, uma linha "hora nome código" por pedido.
+ * do PDF, uma linha "hora nome código" por check-in.
  */
-export function montarTextoHistorico(linhas: LinhaHistorico[]): string {
+export function montarTextoCheckIns(linhas: LinhaCheckIn[]): string {
   const porData = agruparPorData(linhas);
   const blocos: string[] = [];
   for (const [data, grupo] of porData) {
     const corpo = grupo
-      .map((l) => [l.horaPedido, l.clienteNome, l.clienteCodigo].filter(Boolean).join(" "))
+      .map((l) => [l.hora, l.clienteNome, l.clienteCodigo].filter(Boolean).join(" "))
       .join("\n");
     blocos.push(`${dataCurta(data)}\n${corpo}`);
   }
@@ -83,10 +77,7 @@ const LIMITE_RODAPE = ALTURA_A4 - 20;
 const AZUL_MARCA: [number, number, number] = [28, 115, 183];
 const BORDA_GRADE: [number, number, number] = [201, 214, 226];
 
-export async function gerarPdfHistorico(
-  linhas: LinhaHistorico[],
-  titulo: string,
-): Promise<Blob> {
+export async function gerarPdfCheckIns(linhas: LinhaCheckIn[], titulo: string): Promise<Blob> {
   const { jsPDF: JsPDF } = await import("jspdf");
   const doc = new JsPDF({ unit: "mm", format: "a4" });
   let y = MARGEM;
@@ -102,7 +93,7 @@ export async function gerarPdfHistorico(
   if (datas.length === 0) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Nenhum pedido neste filtro.", MARGEM, y + 4);
+    doc.text("Nenhum check-in neste filtro.", MARGEM, y + 4);
     return doc.output("blob");
   }
 
@@ -138,7 +129,7 @@ export async function gerarPdfHistorico(
         doc.addPage();
         y = MARGEM;
       }
-      doc.text(linha.horaPedido, MARGEM, y);
+      doc.text(linha.hora, MARGEM, y);
       doc.text(linha.clienteNome, MARGEM + 22, y);
       doc.text(linha.clienteCodigo, LARGURA_A4 - MARGEM - 20, y);
       y += 6;

@@ -37,7 +37,8 @@ export function ClientesPage() {
   const buscaDebounced = useDebounce(busca);
 
   const selecionando = params.get("selecionar") === "1";
-  const marca = params.get("marca") ?? "";
+  /** Pra onde voltar (com `?clienteId=` anexado) depois de escolher/criar um cliente. */
+  const retorno = params.get("retorno") ?? "/pedidos/novo";
 
   const { dados: clientesBrutos } = useDados(
     () => repo.listarClientes(buscaDebounced),
@@ -51,13 +52,12 @@ export function ClientesPage() {
   }, [clientesBrutos, ordem]);
 
   function aoEscolher(id: string) {
-    navigate(`/pedidos/novo?clienteId=${id}&marca=${encodeURIComponent(marca)}`, {
-      replace: true,
-    });
+    const separador = retorno.includes("?") ? "&" : "?";
+    navigate(`${retorno}${separador}clienteId=${id}`, { replace: true });
   }
 
   const destinoNovo = selecionando
-    ? `/clientes/novo?selecionar=1&marca=${encodeURIComponent(marca)}`
+    ? `/clientes/novo?selecionar=1&retorno=${encodeURIComponent(retorno)}`
     : "/clientes/novo";
 
   return (

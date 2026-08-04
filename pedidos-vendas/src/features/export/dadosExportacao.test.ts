@@ -58,6 +58,35 @@ describe("montarDadosExportacao — descrição do produto exportada", () => {
   });
 });
 
+describe("montarDadosExportacao — condição de pagamento", () => {
+  it("usa a do cliente quando o pedido não tem uma própria", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(pedido, { ...cliente, condicaoPagamento: "Pix" });
+    expect(dados.cliente.condicaoPagamento).toBe("Pix");
+  });
+
+  it("prioriza a condição de pagamento editada no pedido sobre a do cadastro do cliente", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(
+      { ...pedido, condicaoPagamento: "Boleto 30" },
+      { ...cliente, condicaoPagamento: "Pix" },
+    );
+    expect(dados.cliente.condicaoPagamento).toBe("Boleto 30");
+  });
+});
+
 describe("nomeArquivo", () => {
   it("continua funcionando normalmente", () => {
     const pedido = pedidoComItem({

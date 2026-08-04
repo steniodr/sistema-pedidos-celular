@@ -96,6 +96,7 @@ export function PedidoPage() {
               <div className="linha linha--entre">
                 <span className="texto-forte">
                   {item.item}. {item.descricaoProduto}
+                  {item.comDesconto && <span className={css.tagPromocional}>Promocional</span>}
                 </span>
                 <span className="texto-forte">{formatarMoeda(totalItem(item))}</span>
               </div>

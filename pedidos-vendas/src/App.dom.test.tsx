@@ -8,6 +8,7 @@ import { ConfirmProvider } from "./components/ui/Confirm";
 import { ToastProvider } from "./components/ui/Toast";
 import { dexieRepository } from "./data/dexieRepository";
 import { db } from "./db/schema";
+import { totaisPedido } from "./domain/calculos";
 
 /**
  * Percurso completo do vendedor sobre o repositório real (Dexie em IndexedDB
@@ -245,7 +246,10 @@ describe("fluxo do pedido", () => {
       const salvo = await dexieRepository.obterPedido(pedido.id);
       expect(salvo?.status).toBe("enviado");
     });
-    expect(await screen.findByText("Excel gerado.")).toBeDefined();
+    // Sem `fetch` mockado pro molde neste teste, cai no gerador alternativo —
+    // o toast avisa isso explicitamente (ver correção do "Excel saindo no
+    // modelo padrão sem aviso").
+    expect(await screen.findByText(/Excel gerado no modelo padrão/)).toBeDefined();
   });
 
   it("exige confirmação extra ao finalizar com a base de preços crítica (>90 dias)", async () => {
@@ -280,6 +284,55 @@ describe("fluxo do pedido", () => {
     // Cancelou a confirmação: não deve exportar nem marcar como enviado.
     const aindaRascunho = await dexieRepository.obterPedido(pedido.id);
     expect(aindaRascunho?.status).toBe("rascunho");
+  });
+
+  it("item marcado como 'com desconto' fica de fora do desconto geral do pedido", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "ARARA AZUL" });
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    await screen.findByRole("heading", { name: "Adicionar item" });
+    await preencher(/^Produto/, "Verniz");
+    await userEvent.click(await screen.findByText("Usar “Verniz”"));
+    await preencher(/^Embalagem/, "Galão");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /Item com desconto/ }),
+    );
+    // "Padrão / Complemento" vem pré-preenchido ao marcar o checkbox (esse
+    // campo aparece no Excel/PDF exportado, diferente da observação livre).
+    expect(await screen.findByDisplayValue("Valor promocional")).toBeDefined();
+    await preencher(/^Quantidade/, "1");
+    await preencher(/Valor unitário/, "500");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
+
+    // De volta ao pedido (mesma navegação da tela, sem remontar) — adiciona um
+    // segundo item, normal (sujeito ao desconto geral).
+    await userEvent.click(await screen.findByRole("button", { name: "+ Adicionar item" }));
+    await preencher(/^Produto/, "Esmalte");
+    await userEvent.click(await screen.findByText("Usar “Esmalte”"));
+    await preencher(/^Embalagem/, "Lata");
+    await preencher(/^Quantidade/, "1");
+    await preencher(/Valor unitário/, "1000");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Resumo" }));
+    await preencher(/Percentual/, "10");
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.descontoValor).toBe(10);
+    });
+    const salvo = await dexieRepository.obterPedido(pedido.id);
+    // Subtotal soma os dois (1500); desconto de 10% incide só sobre o item
+    // normal (1000) — o promocional (500) não entra na base.
+    expect(salvo).toBeDefined();
+    const totais = totaisPedido(salvo!);
+    expect(totais.subtotal).toBe(1500);
+    expect(totais.desconto).toBe(100);
+    expect(totais.total).toBe(1400);
   });
 });
 
@@ -395,5 +448,34 @@ describe("clientes de teste", () => {
     await waitFor(async () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(1);
     });
+  });
+});
+
+describe("check-in", () => {
+  it("escolhe cliente, salva o horário e o check-in aparece na lista", async () => {
+    await dexieRepository.salvarCliente({ nome: "Cliente Visitado", cpfCnpj: "11222333000181" });
+
+    abrir("/checkins/novo");
+    await userEvent.click(await screen.findByRole("button", { name: "Escolher cliente" }));
+
+    const cartaoCliente = await screen.findByText("Cliente Visitado");
+    await userEvent.click(cartaoCliente);
+
+    // Volta pra /checkins/novo já com o cliente escolhido e horário pré-preenchido
+    // (padrão a hora atual — não mexe no campo, só confirma que salva assim mesmo).
+    await screen.findByText("Toque para trocar de cliente");
+    const campoHorario = screen.getByLabelText(/^Horário/) as HTMLInputElement;
+    expect(campoHorario.value).toMatch(/^\d{2}:\d{2}$/);
+    await userEvent.click(screen.getByRole("button", { name: "Salvar check-in" }));
+
+    await waitFor(async () => {
+      expect(await dexieRepository.listarCheckIns()).toHaveLength(1);
+    });
+    const [checkIn] = await dexieRepository.listarCheckIns();
+    expect(checkIn.hora).toBe(campoHorario.value);
+
+    // A lista de Check-in mostra o cliente e o horário salvos.
+    expect(await screen.findByText("Cliente Visitado")).toBeDefined();
+    expect(await screen.findByText(checkIn.hora)).toBeDefined();
   });
 });

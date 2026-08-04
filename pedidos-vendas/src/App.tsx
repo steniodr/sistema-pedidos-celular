@@ -15,6 +15,8 @@ import { ItemPedidoPage } from "./features/pedidos/ItemPedidoPage";
 import { ResumoPedidoPage } from "./features/pedidos/ResumoPedidoPage";
 import { FinalizarPedidoPage } from "./features/pedidos/FinalizarPedidoPage";
 import { HistoricoPage } from "./features/pedidos/HistoricoPage";
+import { CheckInsPage } from "./features/checkin/CheckInsPage";
+import { CheckInFormPage } from "./features/checkin/CheckInFormPage";
 import { RelatoriosPage } from "./features/relatorios/RelatoriosPage";
 import { ConfigPage } from "./features/config/ConfigPage";
 import { RepresentanteFormPage } from "./features/config/RepresentanteFormPage";
@@ -52,6 +54,10 @@ export function App() {
       <Route path="/pedidos/:id/item/:indice" element={<ItemPedidoPage />} />
       <Route path="/pedidos/:id/resumo" element={<ResumoPedidoPage />} />
       <Route path="/pedidos/:id/finalizar" element={<FinalizarPedidoPage />} />
+
+      <Route path="/checkins" element={<CheckInsPage />} />
+      <Route path="/checkins/novo" element={<CheckInFormPage />} />
+      <Route path="/checkins/:id" element={<CheckInFormPage />} />
 
       <Route path="/relatorios" element={<RelatoriosPage />} />
 

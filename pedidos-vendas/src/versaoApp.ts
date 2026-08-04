@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.1";
+export const VERSAO_APP = "1.2";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,16 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.2",
+    data: "2026-08-03",
+    itens: [
+      "Nova tela Check-in: registra a visita ao cliente (horário editável, padrão a hora atual), com exportação em PDF/texto agrupada por data — o horário sai do pedido e passa a viver aqui",
+      "Pedido: item pode ser marcado como \"com desconto\" (valor promocional avulso), que fica de fora do cálculo do desconto geral do pedido",
+      "Finalizar pedido: condição de pagamento vem pré-preenchida do cadastro do cliente e pode ser editada só para aquele pedido",
+      "Excel: quando sai no modelo padrão em vez do oficial, um aviso explica o motivo (sem internet/molde ainda não baixado, ou pedido com mais itens do que o molde comporta) — o app também tenta baixar o molde assim que abre, não só na hora de exportar",
+    ],
+  },
   {
     versao: "1.1",
     data: "2026-08-03",

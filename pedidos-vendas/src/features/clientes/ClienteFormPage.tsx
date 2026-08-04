@@ -43,7 +43,7 @@ export function ClienteFormPage() {
   const [params] = useSearchParams();
 
   const selecionando = params.get("selecionar") === "1";
-  const marca = params.get("marca") ?? "";
+  const retorno = params.get("retorno") ?? "/pedidos/novo";
 
   const [form, setForm] = useState<EntradaCliente>(VAZIO);
   const [erroDocumento, setErroDocumento] = useState<string | undefined>();
@@ -89,10 +89,8 @@ export function ClienteFormPage() {
       const salvo = await repo.salvarCliente({ ...form, id });
       toast.sucesso("Cliente salvo.");
       if (selecionando) {
-        navigate(
-          `/pedidos/novo?clienteId=${salvo.id}&marca=${encodeURIComponent(marca)}`,
-          { replace: true },
-        );
+        const separador = retorno.includes("?") ? "&" : "?";
+        navigate(`${retorno}${separador}clienteId=${salvo.id}`, { replace: true });
       } else {
         navigate(-1);
       }

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
-import { Input, Textarea } from "../../components/ui/Field";
+import { Checkbox, Input, Textarea } from "../../components/ui/Field";
 import { BarraInferior, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, lerNumeroBR, totalItem } from "../../domain/calculos";
@@ -40,6 +40,7 @@ export function ItemPedidoPage() {
   const [cor, setCor] = useState("");
   const [padraoComplemento, setPadraoComplemento] = useState("");
   const [descricaoLivre, setDescricaoLivre] = useState("");
+  const [comDesconto, setComDesconto] = useState(false);
   const [qtdTexto, setQtdTexto] = useState("1");
   const [valorTexto, setValorTexto] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -57,6 +58,7 @@ export function ItemPedidoPage() {
         setCor(existente.cor ?? "");
         setPadraoComplemento(existente.padraoComplemento ?? "");
         setDescricaoLivre(existente.descricao ?? "");
+        setComDesconto(existente.comDesconto ?? false);
         setQtdTexto(String(existente.qtd));
         setValorTexto(String(existente.valorUnit).replace(".", ","));
         // Só para popular as opções de embalagem; a variante já veio do item salvo.
@@ -129,6 +131,14 @@ export function ItemPedidoPage() {
     if (correspondente) setValorTexto(String(correspondente.valorUnit).replace(".", ","));
   }
 
+  function alternarComDesconto(valor: boolean) {
+    setComDesconto(valor);
+    // Só sugere o texto se o vendedor ainda não escreveu nada — não sobrescreve
+    // um complemento já digitado. Vai em "Padrão / Complemento" (não na
+    // observação livre) porque esse campo aparece no Excel/PDF exportado.
+    if (valor && !padraoComplemento.trim()) setPadraoComplemento("Valor promocional");
+  }
+
   function ajustarQtd(delta: number) {
     const atual = lerNumeroBR(qtdTexto) ?? 0;
     const novo = Math.max(1, atual + delta);
@@ -162,6 +172,7 @@ export function ItemPedidoPage() {
         cor: cor || undefined,
         padraoComplemento: padraoComplemento || undefined,
         descricao: descricaoLivre || undefined,
+        comDesconto: comDesconto || undefined,
       };
       const itens = editando
         ? pedido.itens.map((atual, i) => (i === posicao ? item : atual))
@@ -299,6 +310,12 @@ export function ItemPedidoPage() {
           +
         </Button>
       </div>
+      <Checkbox
+        rotulo="Item com desconto (valor promocional)"
+        checked={comDesconto}
+        onChange={alternarComDesconto}
+        ajuda="Fica de fora do desconto geral do pedido, calculado em Resumo."
+      />
       <Input
         rotulo="Valor unitário (R$)"
         obrigatorio

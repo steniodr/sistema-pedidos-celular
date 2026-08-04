@@ -58,6 +58,8 @@ export interface ItemPedido {
   /** Campo livre do vendedor, não vai para a coluna de descrição do produto. */
   descricao?: string;
   valorUnit: number;
+  /** Item com valor promocional avulso — fica de fora da base do desconto geral do pedido. */
+  comDesconto?: boolean;
 }
 
 export type DescontoTipo = "percentual" | "valor";
@@ -70,12 +72,12 @@ export interface Pedido {
   marca: string;
   clienteId: string;
   dataPedido: string;
-  /** Horário do pedido, formato "HH:mm" — editável, igual à data. */
-  horaPedido?: string;
   representanteNome?: string;
   representanteTelefone?: string;
   representanteEmail?: string;
   formaSolicitacao?: string;
+  /** Pré-preenchida do cadastro do cliente ao criar o pedido; editável, não altera o cadastro. */
+  condicaoPagamento?: string;
   itens: ItemPedido[];
   descontoTipo: DescontoTipo;
   descontoValor: number;
@@ -84,6 +86,18 @@ export interface Pedido {
   status: StatusPedido;
   /** Criado pelo gerador de dados de teste (Configurações) — excluído dos totais de Relatórios. */
   teste?: boolean;
+  criadoEm: ISODateTime;
+  atualizadoEm: ISODateTime;
+}
+
+/** Check-in de visita a um cliente — independente de existir pedido. */
+export interface CheckIn {
+  id: string;
+  clienteId: string;
+  /** "YYYY-MM-DD", padrão o dia atual. */
+  data: string;
+  /** "HH:mm", padrão a hora atual — editável. */
+  hora: string;
   criadoEm: ISODateTime;
   atualizadoEm: ISODateTime;
 }

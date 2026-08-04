@@ -101,6 +101,21 @@
   color: var(--cor-erro);
 }
 
+.checkboxLinha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--alvo-toque);
+  cursor: pointer;
+}
+
+.checkboxControle {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--cor-primaria);
+}
+
 /* ---------- Chip ---------- */
 .chips {
   display: flex;

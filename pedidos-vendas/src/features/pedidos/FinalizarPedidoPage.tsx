@@ -10,7 +10,8 @@ import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/La
 import { StatusPedido } from "../../components/ui/StatusPedido";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
-import { validarCpfCnpj } from "../../domain/cpfCnpj";
+import { CONDICOES_PAGAMENTO } from "../../domain/condicoesPagamento";
+import { mascararTelefone, validarCpfCnpj } from "../../domain/cpfCnpj";
 import { mensagemErro } from "../../domain/erros";
 import { FORMAS_SOLICITACAO } from "../../domain/formasSolicitacao";
 import { baixarArquivo, montarDadosExportacao, nomeArquivo } from "../export/dadosExportacao";
@@ -78,19 +79,43 @@ export function FinalizarPedidoPage() {
     setExportando(formato);
     try {
       const dados = montarDadosExportacao(pedido, cliente);
-      const blob = formato === "excel" ? await gerarExcel(dados) : await gerarPdf(dados);
-      baixarArquivo(blob, nomeArquivo(dados, formato === "excel" ? "xlsx" : "pdf"));
+      if (formato === "excel") {
+        const resultado = await gerarExcel(dados);
+        baixarArquivo(resultado.blob, nomeArquivo(dados, "xlsx"));
+        if (resultado.usouModelo) {
+          toast.sucesso("Excel gerado no modelo oficial.");
+        } else if (resultado.motivoFallback === "capacidade") {
+          toast.info(
+            "Este pedido tem mais itens do que o molde oficial comporta — Excel gerado no modelo padrão.",
+          );
+        } else if (resultado.motivoFallback === "erro") {
+          toast.erro(
+            "Não consegui usar o molde oficial (algo mudou na estrutura do arquivo) — Excel gerado no modelo padrão. Avise o suporte.",
+          );
+        } else {
+          toast.info(
+            "Molde oficial indisponível agora (sem internet ou ainda não baixado neste aparelho) — Excel gerado no modelo padrão.",
+          );
+        }
+      } else {
+        const blob = await gerarPdf(dados);
+        baixarArquivo(blob, nomeArquivo(dados, "pdf"));
+        toast.sucesso("PDF gerado.");
+      }
 
       if (pedido.status !== "enviado") {
         await atualizar({ status: "enviado" });
       }
       setExportado(true);
-      toast.sucesso(formato === "excel" ? "Excel gerado." : "PDF gerado.");
     } catch (e) {
       toast.erro(mensagemErro(e, "Falha ao gerar o arquivo."));
     } finally {
       setExportando(null);
     }
+  }
+
+  async function usarCondicaoPagamentoDoCliente() {
+    await atualizar({ condicaoPagamento: cliente?.condicaoPagamento ?? "" });
   }
 
   async function usarRepresentanteSalvo() {
@@ -137,18 +162,23 @@ export function FinalizarPedidoPage() {
         value={pedido.dataPedido}
         onChange={(e) => atualizar({ dataPedido: e.target.value })}
       />
-      <Input
-        rotulo="Horário do pedido"
-        type="time"
-        value={pedido.horaPedido ?? ""}
-        onChange={(e) => atualizar({ horaPedido: e.target.value })}
-      />
       <SelectComOutro
         rotulo="Forma de solicitação"
         opcoes={FORMAS_SOLICITACAO}
         value={pedido.formaSolicitacao ?? ""}
         onChange={(valor) => atualizar({ formaSolicitacao: valor })}
       />
+      <SelectComOutro
+        rotulo="Condição de pagamento"
+        opcoes={CONDICOES_PAGAMENTO}
+        value={pedido.condicaoPagamento ?? ""}
+        onChange={(valor) => atualizar({ condicaoPagamento: valor })}
+      />
+      {cliente?.condicaoPagamento && cliente.condicaoPagamento !== pedido.condicaoPagamento && (
+        <Button variante="fantasma" onClick={usarCondicaoPagamentoDoCliente}>
+          Usar do cliente ({cliente.condicaoPagamento})
+        </Button>
+      )}
 
       <div className="linha linha--entre">
         <h2 className="secao-titulo">Representante</h2>
@@ -163,7 +193,8 @@ export function FinalizarPedidoPage() {
       />
       <Input
         rotulo="Telefone"
-        value={pedido.representanteTelefone ?? ""}
+        inputMode="tel"
+        value={mascararTelefone(pedido.representanteTelefone ?? "")}
         onChange={(e) => atualizar({ representanteTelefone: e.target.value })}
       />
       <Input

@@ -89,7 +89,7 @@ const pedido: Pedido = {
 
 async function abrirGerado() {
   const dados = montarDadosExportacao(pedido, cliente);
-  const blob = await gerarExcel(dados);
+  const { blob } = await gerarExcel(dados);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await blob.arrayBuffer());
   return { workbook, planilha: workbook.getWorksheet("Pedido")!, dados };
@@ -115,18 +115,52 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     expect(planilha.getCell("D8").value).toBe("Depósito central");
   });
 
-  it("preenche as linhas de item preservando a fórmula de total, sem os detalhes/variante no nome", async () => {
+  it("preenche as linhas de item com o total como valor fixo, sem os detalhes/variante no nome", async () => {
     const { planilha } = await abrirGerado();
     // Só o nome do produto — "(exceto amarelo, laranja e vermelho)" não aparece.
     expect(planilha.getCell("D11").value).toBe("Esmalte sintético brilhante");
     expect(planilha.getCell("B11").value).toBe(10);
     expect(planilha.getCell("G11").value).toBe(95.64);
 
-    const total = planilha.getCell("H11").value as { formula: string; result: number };
-    expect(total.formula).toBe("G11*B11");
-    expect(total.result).toBeCloseTo(956.4);
+    // Valor fixo, não fórmula — ver comentário em `preencherModelo` sobre por
+    // que fórmula compartilhada do molde não é preservada (corrompia o arquivo
+    // ao serializar com mais de 2 itens).
+    expect(planilha.getCell("H11").value).toBeCloseTo(956.4);
 
     expect(planilha.getCell("D12").value).toBe("Verniz marítimo");
+  });
+
+  it("com 3 ou mais itens, não trava na fórmula compartilhada de total (regressão)", async () => {
+    // Bug real: em algumas linhas o ExcelJS lança ao traduzir a fórmula
+    // compartilhada de "Total" (TypeError: Cannot read properties of undefined
+    // (reading 'replace')) — só aparecia a partir do 3º item porque os testes
+    // acima sempre usaram 2. `preencherModelo` deve continuar (com valor fixo
+    // na célula problemática) em vez de derrubar a exportação inteira.
+    const pedidoTresItens: Pedido = {
+      ...pedido,
+      itens: [
+        ...pedido.itens,
+        { item: 3, qtd: 1, embalagem: "Galão (3,6 L)", descricaoProduto: "Selador acrílico", valorUnit: 68.9 },
+      ],
+    };
+    const dados = montarDadosExportacao(pedidoTresItens, cliente);
+    const { blob, usouModelo, motivoFallback } = await gerarExcel(dados);
+
+    expect(usouModelo).toBe(true);
+    expect(motivoFallback).toBeUndefined();
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await blob.arrayBuffer());
+    const planilha = workbook.getWorksheet("Pedido")!;
+    expect(planilha.getCell("D13").value).toBe("Selador acrílico");
+    // Célula do total: valor correto, seja como fórmula ou como valor fixo
+    // (dependendo se o ExcelJS conseguiu traduzir a fórmula compartilhada).
+    const totalLinha13 = planilha.getCell("H13").value;
+    const resultado =
+      typeof totalLinha13 === "object" && totalLinha13 !== null
+        ? (totalLinha13 as { result: number }).result
+        : totalLinha13;
+    expect(resultado).toBeCloseTo(68.9);
   });
 
   it("preenche o rodapé de 4 colunas, com o total já descontado", async () => {
@@ -158,7 +192,7 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
   it("mostra Subtotal e Desconto (R$ 0,00) mesmo sem desconto aplicado", async () => {
     const pedidoSemDesconto: Pedido = { ...pedido, descontoTipo: "valor", descontoValor: 0 };
     const dados = montarDadosExportacao(pedidoSemDesconto, cliente);
-    const blob = await gerarExcel(dados);
+    const { blob } = await gerarExcel(dados);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await blob.arrayBuffer());
     const planilha = workbook.getWorksheet("Pedido")!;
@@ -171,7 +205,7 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
   it("mostra o motivo do desconto como nota na célula do valor, sem usar uma 3ª linha", async () => {
     const pedidoComMotivo: Pedido = { ...pedido, descontoDescricao: "Autorizado pelo gerente" };
     const dados = montarDadosExportacao(pedidoComMotivo, cliente);
-    const blob = await gerarExcel(dados);
+    const { blob } = await gerarExcel(dados);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await blob.arrayBuffer());
     const planilha = workbook.getWorksheet("Pedido")!;
@@ -204,7 +238,9 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     const pedidoGrande: Pedido = { ...pedido, itens: muitosItens };
     const dados = montarDadosExportacao(pedidoGrande, cliente);
 
-    const blob = await gerarExcel(dados);
+    const { blob, usouModelo, motivoFallback } = await gerarExcel(dados);
+    expect(usouModelo).toBe(false);
+    expect(motivoFallback).toBe("capacidade");
     expect(blob.size).toBeGreaterThan(0);
 
     const workbook = new ExcelJS.Workbook();

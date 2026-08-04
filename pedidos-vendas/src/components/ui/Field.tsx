@@ -89,6 +89,35 @@ export function Textarea({
   );
 }
 
+export function Checkbox({
+  rotulo,
+  checked,
+  onChange,
+  ajuda,
+}: {
+  rotulo: string;
+  checked: boolean;
+  onChange: (valor: boolean) => void;
+  ajuda?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={css.campo}>
+      <label className={css.checkboxLinha} htmlFor={id}>
+        <input
+          id={id}
+          type="checkbox"
+          className={css.checkboxControle}
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span>{rotulo}</span>
+      </label>
+      {ajuda && <span className={css.campoAjuda}>{ajuda}</span>}
+    </div>
+  );
+}
+
 export function Select({
   rotulo,
   obrigatorio,

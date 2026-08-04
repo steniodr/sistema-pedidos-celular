@@ -1,4 +1,5 @@
 import type {
+  CheckIn,
   Cliente,
   ImportacaoInfo,
   Pedido,
@@ -55,6 +56,14 @@ export interface Repository {
   duplicarPedido(id: string): Promise<Pedido>;
   proximoNumeroPedido(): Promise<number>;
 
+  // Check-in (visita ao cliente, independente de pedido)
+  listarCheckIns(filtro?: FiltroCheckIns): Promise<CheckIn[]>;
+  obterCheckIn(id: string): Promise<CheckIn | undefined>;
+  salvarCheckIn(checkIn: EntradaCheckIn): Promise<CheckIn>;
+  removerCheckIn(id: string): Promise<void>;
+  /** Recoloca um check-in exatamente como estava — usado só pelo "Desfazer" da exclusão. */
+  restaurarCheckIn(checkIn: CheckIn): Promise<void>;
+
   // Configuração
   obterRepresentante(): Promise<Representante | undefined>;
   salvarRepresentante(representante: Representante): Promise<void>;
@@ -102,6 +111,16 @@ export interface FiltroPedidos {
   busca?: string;
 }
 
+export type EntradaCheckIn = Omit<CheckIn, "id" | "criadoEm" | "atualizadoEm"> & {
+  id?: string;
+};
+
+export interface FiltroCheckIns {
+  clienteId?: string;
+  /** Casa nome do cliente vinculado. */
+  busca?: string;
+}
+
 /** Cópia completa da base local — baixada como .json e usada para restaurar em outro aparelho. */
 export interface BackupDados {
   versao: 1;
@@ -109,6 +128,7 @@ export interface BackupDados {
   clientes: Cliente[];
   produtos: Produto[];
   pedidos: Pedido[];
+  checkIns?: CheckIn[];
   representante?: Representante;
   ultimaImportacao?: ImportacaoInfo;
 }

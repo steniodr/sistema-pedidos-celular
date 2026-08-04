@@ -5,6 +5,23 @@ import { MAPA_PADRAO, type MapaModelo } from "./mapaCelulas";
 const CAMINHO_MODELO = "/templates/modelo_pedido.xlsx";
 const FORMATO_MOEDA = '"R$" #,##0.00';
 
+/** Pedido tem mais itens do que o molde oficial comporta — força o gerador alternativo. */
+export class CapacidadeExcedidaError extends Error {}
+
+export interface ResultadoExcel {
+  blob: Blob;
+  /** `false` quando caiu no gerador alternativo. */
+  usouModelo: boolean;
+  /**
+   * Motivo da queda pro gerador alternativo, só quando `usouModelo` é `false`:
+   * - "indisponivel": o molde não pôde ser buscado (sem internet e sem cache local).
+   * - "capacidade": o pedido tem mais itens do que o molde comporta.
+   * - "erro": o molde foi carregado normalmente, mas algo deu errado ao preenchê-lo
+   *   (ex.: estrutura do arquivo mudou) — ver console para o erro completo.
+   */
+  motivoFallback?: "indisponivel" | "capacidade" | "erro";
+}
+
 /**
  * Gera o .xlsx do pedido.
  *
@@ -29,27 +46,33 @@ const FORMATO_MOEDA = '"R$" #,##0.00';
 export async function gerarExcel(
   dados: DadosExportacao,
   mapa: MapaModelo = MAPA_PADRAO,
-): Promise<Blob> {
+): Promise<ResultadoExcel> {
   // ExcelJS é pesado e só é usado na exportação: carrega sob demanda.
   const { default: ExcelJS } = await import("exceljs");
   const modelo = await carregarModelo();
 
   let workbook: Workbook;
+  let usouModelo = false;
+  let motivoFallback: ResultadoExcel["motivoFallback"];
   if (modelo) {
     try {
       workbook = await preencherModelo(new ExcelJS.Workbook(), modelo, dados, mapa);
+      usouModelo = true;
     } catch (e) {
       console.error("Falha ao preencher o modelo oficial; usando gerador alternativo.", e);
       workbook = construirDoZero(new ExcelJS.Workbook(), dados);
+      motivoFallback = e instanceof CapacidadeExcedidaError ? "capacidade" : "erro";
     }
   } else {
     workbook = construirDoZero(new ExcelJS.Workbook(), dados);
+    motivoFallback = "indisponivel";
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  return new Blob([buffer], {
+  const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
+  return { blob, usouModelo, motivoFallback };
 }
 
 /** `true` quando o modelo oficial está presente; a tela usa isso para avisar o vendedor. */
@@ -95,7 +118,7 @@ async function preencherModelo(
   // gerarExcel) — melhor lançar cedo, antes de escrever qualquer coisa, e deixar o
   // chamador cair no gerador alternativo com o arquivo intacto.
   if (dados.itens.length > capacidadeProdutos) {
-    throw new Error(
+    throw new CapacidadeExcedidaError(
       `O pedido tem ${dados.itens.length} itens; o molde só comporta ${capacidadeProdutos}.`,
     );
   }
@@ -114,21 +137,25 @@ async function preencherModelo(
     planilha.getCell(`${colunas.padraoComplemento}${linha}`).value = item.padraoComplemento;
     planilha.getCell(`${colunas.valorUnit}${linha}`).value = item.valorUnit;
 
-    // Mantém a fórmula do modelo (=B×G); só grava valor fixo se a célula não tiver fórmula.
-    const celulaTotal = planilha.getCell(`${colunas.total}${linha}`);
-    if (celulaTotal.formula) {
-      celulaTotal.value = { formula: celulaTotal.formula, result: item.total };
-    } else {
-      celulaTotal.value = item.total;
-    }
+    // Valor fixo, não fórmula. O molde real usa fórmula COMPARTILHADA na coluna
+    // de total (uma só definição "espalhada" pelas linhas seguintes pelo próprio
+    // Excel) — ler ou preservar essa fórmula por célula deixa o ExcelJS instável
+    // ao serializar de volta (a célula "mestre" da fórmula compartilhada, ao ser
+    // sobrescrita com valor fixo numa linha, orfanа as cópias dela nas linhas
+    // vizinhas — erro real observado: "Shared Formula master must exist above
+    // and or left of clone"). Gravar sempre valor fixo evita essa classe de bug
+    // por completo; o total exportado continua correto, só deixa de ser uma
+    // fórmula "viva" e editável dentro do Excel.
+    planilha.getCell(`${colunas.total}${linha}`).value = item.total;
   });
 
   // Linhas de produto sobrando no modelo (entre o último item e o Subtotal) ficam
-  // em branco.
+  // em branco — em TODAS as colunas, mesmo as que tinham fórmula no molde (ver
+  // comentário acima sobre fórmula compartilhada: tentar preservar seletivamente
+  // é o que corrompe o arquivo).
   for (let linha = primeiraLinha + dados.itens.length; linha < linhaSubtotal; linha++) {
     for (const coluna of Object.values(colunas)) {
-      const celula = planilha.getCell(`${coluna}${linha}`);
-      if (!celula.formula) celula.value = null;
+      planilha.getCell(`${coluna}${linha}`).value = null;
     }
   }
 

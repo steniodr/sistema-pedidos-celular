@@ -69,7 +69,7 @@ const pedido: Pedido = {
 
 async function abrirGerado() {
   const dados = montarDadosExportacao(pedido, cliente);
-  const blob = await gerarExcel(dados);
+  const { blob } = await gerarExcel(dados);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await blob.arrayBuffer());
   return { workbook, planilha: workbook.worksheets[0], dados };
@@ -141,7 +141,7 @@ describe("gerarExcel (sem modelo oficial)", () => {
       { ...pedido, descontoDescricao: "Autorizado pelo gerente" },
       cliente,
     );
-    const blob = await gerarExcel(dados);
+    const { blob } = await gerarExcel(dados);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await blob.arrayBuffer());
     const planilha = workbook.worksheets[0];

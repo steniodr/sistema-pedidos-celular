@@ -49,6 +49,9 @@ export function HomePage() {
         <LinkButton to="/pedidos/novo" grande bloco>
           Novo pedido
         </LinkButton>
+        <LinkButton to="/checkins" grande bloco variante="secundario">
+          Check-in
+        </LinkButton>
 
         <div className={css.atalhos}>
           <LinkButton to="/clientes" variante="secundario">

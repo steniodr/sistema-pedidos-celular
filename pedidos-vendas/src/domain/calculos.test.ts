@@ -9,8 +9,8 @@ import {
 } from "./calculos";
 import type { ItemPedido } from "./types";
 
-function item(qtd: number, valorUnit: number): ItemPedido {
-  return { item: 1, qtd, valorUnit, embalagem: "", descricaoProduto: "Teste" };
+function item(qtd: number, valorUnit: number, comDesconto?: boolean): ItemPedido {
+  return { item: 1, qtd, valorUnit, embalagem: "", descricaoProduto: "Teste", comDesconto };
 }
 
 describe("totalItem", () => {
@@ -73,6 +73,18 @@ describe("totaisPedido", () => {
     expect(totais.subtotal).toBe(1863.02);
     expect(totais.desconto).toBe(186.3);
     expect(totais.total).toBe(1676.72);
+  });
+
+  it("não aplica o desconto geral sobre itens marcados como 'com desconto' (valor promocional)", () => {
+    const totais = totaisPedido({
+      itens: [item(1, 1000), item(1, 500, true)],
+      descontoTipo: "percentual",
+      descontoValor: 10,
+    });
+    // Subtotal soma os dois; desconto de 10% incide só sobre o item normal (1000).
+    expect(totais.subtotal).toBe(1500);
+    expect(totais.desconto).toBe(100);
+    expect(totais.total).toBe(1400);
   });
 });
 

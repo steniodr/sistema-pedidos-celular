@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { Cliente, Pedido, Produto } from "../domain/types";
+import type { CheckIn, Cliente, Pedido, Produto } from "../domain/types";
 
 /** Linha genérica de configuração/estado do app (chave → valor). */
 export interface MetaRegistro {
@@ -11,6 +11,7 @@ export class PedidosDB extends Dexie {
   clientes!: EntityTable<Cliente, "id">;
   produtos!: EntityTable<Produto, "id">;
   pedidos!: EntityTable<Pedido, "id">;
+  checkIns!: EntityTable<CheckIn, "id">;
   meta!: EntityTable<MetaRegistro, "chave">;
 
   constructor() {
@@ -46,6 +47,15 @@ export class PedidosDB extends Dexie {
             delete produto.descricaoProduto;
           });
       });
+    // v3: nova entidade CheckIn (visita ao cliente, desacoplada do pedido) — o
+    // horário deixa de ser gravado no pedido (ver Pedido em domain/types.ts).
+    this.version(3).stores({
+      clientes: "id, nome, cpfCnpj, atualizadoEm",
+      produtos: "id, nome, embalagem",
+      pedidos: "id, numero, status, criadoEm, clienteId",
+      checkIns: "id, clienteId, data",
+      meta: "chave",
+    });
   }
 }
 

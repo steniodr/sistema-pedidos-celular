@@ -133,6 +133,16 @@ describe("dexieRepository — backup e restaurar*", () => {
     expect(pedidosRestantes[0].clienteId).toBe(real.id);
   });
 
+  it("criarPedido pré-preenche a condição de pagamento do cliente", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente A",
+      cpfCnpj: CPF_VALIDO,
+      condicaoPagamento: "Pix",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    expect(pedido.condicaoPagamento).toBe("Pix");
+  });
+
   it("restaurarCliente/restaurarProduto recolocam o registro exatamente como estava", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Original",
@@ -153,5 +163,55 @@ describe("dexieRepository — backup e restaurar*", () => {
 
     expect(await db.clientes.get(cliente.id)).toEqual(cliente);
     expect(await db.produtos.get(produto.id)).toEqual(produto);
+  });
+});
+
+describe("dexieRepository — check-in", () => {
+  beforeEach(async () => {
+    await Promise.all([db.clientes.clear(), db.checkIns.clear()]);
+  });
+
+  it("cria, lista, edita e exclui um check-in", async () => {
+    const cliente = await dexieRepository.salvarCliente({ nome: "Cliente A", cpfCnpj: CPF_VALIDO });
+
+    const criado = await dexieRepository.salvarCheckIn({
+      clienteId: cliente.id,
+      data: "2026-08-03",
+      hora: "09:00",
+    });
+    expect(await dexieRepository.listarCheckIns()).toHaveLength(1);
+
+    const editado = await dexieRepository.salvarCheckIn({ ...criado, hora: "10:30" });
+    expect(editado.id).toBe(criado.id);
+    expect((await dexieRepository.obterCheckIn(criado.id))?.hora).toBe("10:30");
+
+    await dexieRepository.removerCheckIn(criado.id);
+    expect(await dexieRepository.listarCheckIns()).toHaveLength(0);
+
+    await dexieRepository.restaurarCheckIn(editado);
+    expect(await dexieRepository.listarCheckIns()).toHaveLength(1);
+  });
+
+  it("filtra por cliente e por busca (nome do cliente)", async () => {
+    const a = await dexieRepository.salvarCliente({ nome: "Maria Pereira", cpfCnpj: CPF_VALIDO });
+    const b = await dexieRepository.salvarCliente({ nome: "João Silva", cpfCnpj: CNPJ_VALIDO });
+    await dexieRepository.salvarCheckIn({ clienteId: a.id, data: "2026-08-03", hora: "09:00" });
+    await dexieRepository.salvarCheckIn({ clienteId: b.id, data: "2026-08-03", hora: "10:00" });
+
+    expect(await dexieRepository.listarCheckIns({ clienteId: a.id })).toHaveLength(1);
+    expect(await dexieRepository.listarCheckIns({ busca: "maria" })).toHaveLength(1);
+    expect(await dexieRepository.listarCheckIns({ busca: "inexistente" })).toHaveLength(0);
+  });
+
+  it("exportarBackup/restaurarBackup incluem check-ins", async () => {
+    const cliente = await dexieRepository.salvarCliente({ nome: "Cliente A", cpfCnpj: CPF_VALIDO });
+    await dexieRepository.salvarCheckIn({ clienteId: cliente.id, data: "2026-08-03", hora: "09:00" });
+
+    const backup = await dexieRepository.exportarBackup();
+    expect(backup.checkIns).toHaveLength(1);
+
+    await db.checkIns.clear();
+    await dexieRepository.restaurarBackup(backup);
+    expect(await dexieRepository.listarCheckIns()).toHaveLength(1);
   });
 });

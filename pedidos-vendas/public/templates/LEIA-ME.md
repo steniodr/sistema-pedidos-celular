@@ -5,7 +5,10 @@ O arquivo do molde oficial fica aqui, com o nome exato:
     modelo_pedido.xlsx
 
 na aba **"Pedido"**. O app carrega esse arquivo ao exportar, preenche as células
-e preserva toda a formatação original (bordas, mesclagens, fórmulas).
+e preserva toda a formatação original (bordas, mesclagens) — exceto a fórmula
+da coluna de total dos itens (ver linha 42 abaixo: fórmula compartilhada nessa
+coluna corrompia o arquivo ao serializar pedidos com mais de 2 itens; o app
+grava o valor já calculado ali em vez de tentar preservar a fórmula).
 
 **Este arquivo fica fora do precache do service worker de propósito.** Ele é
 buscado com a estratégia `NetworkFirst` (sempre tenta a rede primeiro; só usa a
@@ -41,9 +44,10 @@ estrutura continue seguindo o padrão:
 
 Os únicos campos que o app sempre sobrescreve com o valor do pedido (perdendo o
 texto/fórmula original do molde) são: MARCA, Pedido n°, dados do cliente,
-condição de pagamento, os itens em si, Subtotal, Desconto, e o rodapé inteiro
-(incluindo "VALOR DO PEDIDO", que no molde soma os itens sem considerar
-desconto — o app substitui pelo total já descontado).
+condição de pagamento, os itens em si (incluindo a coluna de total — sempre
+valor fixo, nunca fórmula, mesmo que o molde traga uma), Subtotal, Desconto, e
+o rodapé inteiro (incluindo "VALOR DO PEDIDO", que no molde soma os itens sem
+considerar desconto — o app substitui pelo total já descontado).
 
 ## Se a estrutura mudar de um jeito diferente disso
 

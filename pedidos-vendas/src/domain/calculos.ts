@@ -40,7 +40,11 @@ export function totaisPedido(
   pedido: Pick<Pedido, "itens" | "descontoTipo" | "descontoValor">,
 ): TotaisPedido {
   const sub = subtotal(pedido.itens);
-  const desconto = valorDesconto(sub, pedido.descontoTipo, pedido.descontoValor);
+  // Itens "com desconto" (valor promocional avulso) ficam de fora da base do
+  // desconto geral do pedido — o vendedor já deu o desconto neles na hora de
+  // montar o item, não pode descontar de novo em cima.
+  const subDescontavel = subtotal(pedido.itens.filter((item) => !item.comDesconto));
+  const desconto = valorDesconto(subDescontavel, pedido.descontoTipo, pedido.descontoValor);
   return { subtotal: sub, desconto, total: arredondar(sub - desconto) };
 }
 
