@@ -88,6 +88,55 @@ describe("montarDadosExportacao — descrição do produto exportada", () => {
 
     expect(dados.itens[0].descricaoProduto).toBe("Esmalte sintético brilhante");
   });
+
+  it("usa o nome customizado (nomeExportado) no lugar do nome do produto, quando houver", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão (3,6 L)",
+      descricaoProduto: "Esmalte sintético brilhante",
+      nomeProduto: "Esmalte sintético brilhante",
+      nomeExportado: "Esmalte Premium Linha Ouro",
+      valorUnit: 95.64,
+    });
+
+    const dados = montarDadosExportacao(pedido, cliente);
+
+    expect(dados.itens[0].descricaoProduto).toBe("Esmalte Premium Linha Ouro");
+  });
+
+  it("soma a variação ao nome customizado, quando o item tiver as duas coisas", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Caixa (20 kg)",
+      descricaoProduto: "Arenito glitz",
+      nomeProduto: "Arenito glitz",
+      nomeExportado: "Arenito Efeito Cintilante",
+      variacaoProduto: "médio",
+      valorUnit: 126.58,
+    });
+
+    const dados = montarDadosExportacao(pedido, cliente);
+
+    expect(dados.itens[0].descricaoProduto).toBe("Arenito Efeito Cintilante médio");
+  });
+
+  it("ignora nomeExportado em branco (só espaços) e cai no nome do produto normalmente", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão (3,6 L)",
+      descricaoProduto: "Esmalte sintético brilhante",
+      nomeProduto: "Esmalte sintético brilhante",
+      nomeExportado: "   ",
+      valorUnit: 95.64,
+    });
+
+    const dados = montarDadosExportacao(pedido, cliente);
+
+    expect(dados.itens[0].descricaoProduto).toBe("Esmalte sintético brilhante");
+  });
 });
 
 describe("montarDadosExportacao — condição de pagamento", () => {

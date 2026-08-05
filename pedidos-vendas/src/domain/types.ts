@@ -60,6 +60,12 @@ export interface ItemPedido {
   detalhesProduto?: string;
   /** Variação de tamanho/tipo escolhida (ver `Produto.variacao`) — some ao nome na exportação. */
   variacaoProduto?: string;
+  /**
+   * Nome customizado só para o Excel/PDF exportado, no lugar de `nomeProduto`
+   * (que continua intacto — usado pra reabrir o fluxo guiado e não é alterado
+   * na base de produtos). Embalagem, preço e demais campos do item não mudam.
+   */
+  nomeExportado?: string;
   cor?: string;
   padraoComplemento?: string;
   /** Campo livre do vendedor, não vai para a coluna de descrição do produto. */

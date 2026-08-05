@@ -194,6 +194,66 @@ describe("fluxo do pedido", () => {
     );
   });
 
+  it("permite ajustar o nome final do produto só para o Excel/PDF, sem mudar a base", async () => {
+    await dexieRepository.substituirBaseProdutos(
+      [
+        {
+          nome: "Esmalte sintético brilhante",
+          embalagem: "Galão (3,6 L)",
+          valorUnit: 95.64,
+        },
+      ],
+      "tabela-teste.xlsx",
+    );
+
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "ARARA AZUL" });
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    await screen.findByRole("heading", { name: "Adicionar item" });
+    await preencher(/^Produto/, "esmalte");
+    await userEvent.click(await screen.findByText("Esmalte sintético brilhante"));
+
+    // Sem marcar o checkbox, o campo de nome customizado não aparece.
+    const checkbox = await screen.findByRole("checkbox", { name: /Alterar nome final do produto/ });
+    expect(screen.queryByLabelText(/^Nome final do produto/)).toBeNull();
+
+    await userEvent.click(checkbox);
+    // Pré-preenchido com o nome atual do produto, editável.
+    const campoNomeFinal = (await screen.findByLabelText(
+      /^Nome final do produto/,
+    )) as HTMLInputElement;
+    expect(campoNomeFinal.value).toBe("Esmalte sintético brilhante");
+    await userEvent.clear(campoNomeFinal);
+    await userEvent.type(campoNomeFinal, "Esmalte Premium Linha Ouro");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Galão (3,6 L)" }));
+    await preencher(/^Quantidade/, "1");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.itens).toHaveLength(1);
+    });
+    const salvo = await dexieRepository.obterPedido(pedido.id);
+    // Nome real do produto (base) intacto — só o texto de exportação muda.
+    expect(salvo?.itens[0].nomeProduto).toBe("Esmalte sintético brilhante");
+    expect(salvo?.itens[0].nomeExportado).toBe("Esmalte Premium Linha Ouro");
+    expect(salvo?.itens[0].embalagem).toBe("Galão (3,6 L)");
+    expect(salvo?.itens[0].valorUnit).toBe(95.64);
+
+    const produtosNaBase = await dexieRepository.listarProdutos();
+    expect(produtosNaBase.map((p) => p.nome)).toEqual(["Esmalte sintético brilhante"]);
+
+    const dados = await import("./features/export/dadosExportacao").then((m) =>
+      m.montarDadosExportacao(salvo!, cliente),
+    );
+    expect(dados.itens[0].descricaoProduto).toBe("Esmalte Premium Linha Ouro");
+  });
+
   it("bloqueia a exportação quando o CPF/CNPJ é inválido", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Sem Documento",

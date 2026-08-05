@@ -132,9 +132,11 @@ devolve o motivo (`usouModelo`/`motivoFallback`) e `FinalizarPedidoPage` mostra
 um toast explicando qual dos dois casos aconteceu, em vez de só dizer "Excel
 gerado." sem indicar qual modelo foi usado.
 
-Os arquivos exportados (Excel e PDF) mostram o **nome** do produto seguido da
-**variação** de tamanho/tipo quando o item tiver uma (ex.: "Arenito glitz
-médio") — `detalhes` (a variante de preço, ex.: diferença de cor) nunca
+Os arquivos exportados (Excel e PDF) mostram o **nome** do produto — ou o
+`nomeExportado`, quando o vendedor marcou "Alterar nome final do produto" na
+tela do item para ajustar só esse texto, sem tocar em `nomeProduto`/na base —
+seguido da **variação** de tamanho/tipo quando o item tiver uma (ex.: "Arenito
+glitz médio"). `detalhes` (a variante de preço, ex.: diferença de cor) nunca
 aparece; fica visível só dentro do app (tela do pedido, resumo). A composição
 final é feita em `montarDadosExportacao` (`src/features/export/dadosExportacao.ts`).
 
@@ -181,9 +183,12 @@ escolhido some ao nome no Excel/PDF exportado.
 
 **Pedido** — marca em texto livre e data do pedido (editável em Finalizar; o
 horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
-de produto só por nome (com escolha de variante quando há mais de uma),
-embalagem em chips com opção "Outro", embalagem e valor obrigatórios,
-quantidade com botões −/+, desconto em % ou R$ com motivo opcional. Um item
+de produto só por nome (com escolha de variante/variação quando há mais de
+uma), embalagem em chips com opção "Outro", embalagem e valor obrigatórios,
+quantidade com botões −/+, desconto em % ou R$ com motivo opcional. Checkbox
+"Alterar nome final do produto" mostra um campo editável, pré-preenchido com o
+nome do produto, pra ajustar só o texto que sai no Excel/PDF — embalagem,
+preço e o nome na base de produtos continuam intactos. Um item
 pode ser marcado como "com desconto" (valor promocional avulso, com o campo
 Padrão/Complemento pré-preenchido "Valor promocional", já que esse campo
 aparece no Excel/PDF) — esse item fica de fora do cálculo do desconto geral
@@ -237,7 +242,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.6`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.7`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -245,7 +250,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-165 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
+169 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
 dos moldes Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

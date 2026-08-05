@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.6";
+export const VERSAO_APP = "1.7";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,13 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.7",
+    data: "2026-08-05",
+    itens: [
+      "Adicionar item: checkbox \"Alterar nome final do produto\" — mostra um campo editável, pré-preenchido com o nome atual, pra ajustar só o texto que sai no Excel/PDF; embalagem, preço e o nome na base de produtos continuam intactos",
+    ],
+  },
   {
     versao: "1.6",
     data: "2026-08-05",

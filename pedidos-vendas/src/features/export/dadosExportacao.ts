@@ -81,7 +81,12 @@ export function montarDadosExportacao(
       // o texto combinado "Nome (Detalhes)" usado só para reabrir o fluxo guiado na
       // edição; os arquivos exportados mostram o nome + a variação de tamanho/tipo
       // (quando houver, ex.: "Arenito glitz médio") — detalhes continua fora.
-      descricaoProduto: [item.nomeProduto ?? item.descricaoProduto, item.variacaoProduto]
+      // "nomeExportado" (opcional) substitui só a parte do nome nesse texto — o
+      // vendedor ajustou como o produto aparece no arquivo, sem mexer na base.
+      descricaoProduto: [
+        item.nomeExportado?.trim() || item.nomeProduto || item.descricaoProduto,
+        item.variacaoProduto,
+      ]
         .filter(Boolean)
         .join(" "),
       cor: item.cor ?? "",

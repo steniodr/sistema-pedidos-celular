@@ -40,6 +40,11 @@ export function ItemPedidoPage() {
   const [embalagem, setEmbalagem] = useState("");
   const [embalagemOutro, setEmbalagemOutro] = useState(false);
 
+  // Nome customizado só para o Excel/PDF — não muda o nome na base nem afeta
+  // embalagem/preço, que continuam vindos do produto escolhido normalmente.
+  const [alterarNomeExportado, setAlterarNomeExportado] = useState(false);
+  const [nomeExportado, setNomeExportado] = useState("");
+
   // Demais campos do item.
   const [cor, setCor] = useState("");
   const [padraoComplemento, setPadraoComplemento] = useState("");
@@ -59,6 +64,8 @@ export function ItemPedidoPage() {
         setNomeConfirmado(nome);
         setDetalheEscolhido(existente.detalhesProduto ?? "");
         setVariacaoEscolhida(existente.variacaoProduto ?? "");
+        setAlterarNomeExportado(!!existente.nomeExportado);
+        setNomeExportado(existente.nomeExportado ?? "");
         setEmbalagem(existente.embalagem);
         setCor(existente.cor ?? "");
         setPadraoComplemento(existente.padraoComplemento ?? "");
@@ -93,6 +100,8 @@ export function ItemPedidoPage() {
     setValorTexto("");
     setDetalheEscolhido(null);
     setVariacaoEscolhida(null);
+    setAlterarNomeExportado(false);
+    setNomeExportado("");
     setVariantes([]);
 
     const lista = await repo.listarVariantesPorNome(nome);
@@ -124,6 +133,8 @@ export function ItemPedidoPage() {
     setNomeConfirmado(null);
     setDetalheEscolhido(null);
     setVariacaoEscolhida(null);
+    setAlterarNomeExportado(false);
+    setNomeExportado("");
     setEmbalagem("");
     setEmbalagemOutro(false);
     setVariantes([]);
@@ -197,7 +208,15 @@ export function ItemPedidoPage() {
     embalagem.trim().length > 0 &&
     valorUnit > 0 &&
     !precisaEscolherVariante &&
-    !precisaEscolherVariacao;
+    !precisaEscolherVariacao &&
+    (!alterarNomeExportado || nomeExportado.trim().length > 0);
+
+  function alternarAlterarNomeExportado(valor: boolean) {
+    setAlterarNomeExportado(valor);
+    // Pré-preenche com o nome atual só ao marcar a primeira vez — não
+    // sobrescreve um texto que o vendedor já ajustou e desmarcou/marcou de novo.
+    if (valor && !nomeExportado.trim()) setNomeExportado(nomeFinal);
+  }
 
   async function salvar() {
     if (!pedido || !valido) return;
@@ -213,6 +232,7 @@ export function ItemPedidoPage() {
         nomeProduto: nomeFinal,
         detalhesProduto: detalhesFinal || undefined,
         variacaoProduto: variacaoEscolhida || undefined,
+        nomeExportado: alterarNomeExportado ? nomeExportado.trim() || undefined : undefined,
         cor: cor || undefined,
         padraoComplemento: padraoComplemento || undefined,
         descricao: descricaoLivre || undefined,
@@ -319,6 +339,25 @@ export function ItemPedidoPage() {
       )}
 
       {variacaoEscolhida && <Input rotulo="Variação" value={variacaoEscolhida} readOnly />}
+
+      {nomeConfirmado && !precisaEscolherVariante && !precisaEscolherVariacao && (
+        <>
+          <Checkbox
+            rotulo="Alterar nome final do produto"
+            checked={alterarNomeExportado}
+            onChange={alternarAlterarNomeExportado}
+            ajuda="Só muda o texto que sai no Excel/PDF — a base de produtos não é alterada."
+          />
+          {alterarNomeExportado && (
+            <Input
+              rotulo="Nome final do produto"
+              obrigatorio
+              value={nomeExportado}
+              onChange={(e) => setNomeExportado(e.target.value)}
+            />
+          )}
+        </>
+      )}
 
       {nomeConfirmado && !precisaEscolherVariante && !precisaEscolherVariacao && opcoesEmbalagem.length > 0 && (
         <div className="pilha pilha--apertada">
