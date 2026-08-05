@@ -56,6 +56,38 @@ describe("montarDadosExportacao — descrição do produto exportada", () => {
     const dados = montarDadosExportacao(pedido, cliente);
     expect(dados.itens[0].descricaoProduto).toBe("Esmalte sintético brilhante");
   });
+
+  it("soma a variação de tamanho/tipo ao nome, quando o item tiver uma", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Caixa (20 kg)",
+      descricaoProduto: "Arenito glitz",
+      nomeProduto: "Arenito glitz",
+      detalhesProduto: "base clara/escura e cores",
+      variacaoProduto: "médio",
+      valorUnit: 126.58,
+    });
+
+    const dados = montarDadosExportacao(pedido, cliente);
+
+    expect(dados.itens[0].descricaoProduto).toBe("Arenito glitz médio");
+  });
+
+  it("não soma nada quando o item não tem variação (a maioria dos produtos)", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão (3,6 L)",
+      descricaoProduto: "Esmalte sintético brilhante",
+      nomeProduto: "Esmalte sintético brilhante",
+      valorUnit: 95.64,
+    });
+
+    const dados = montarDadosExportacao(pedido, cliente);
+
+    expect(dados.itens[0].descricaoProduto).toBe("Esmalte sintético brilhante");
+  });
 });
 
 describe("montarDadosExportacao — condição de pagamento", () => {

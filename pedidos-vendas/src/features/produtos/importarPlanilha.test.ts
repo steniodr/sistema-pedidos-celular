@@ -58,6 +58,25 @@ describe("detectarColunasMatriz", () => {
     expect(colunas.detalhes).toBeNull();
     expect(colunas.embalagens.map((e) => e.indice)).toEqual([2, 3]);
   });
+
+  it("identifica a coluna Variação separada de Detalhes, sem tratá-la como embalagem", () => {
+    const colunas = detectarColunasMatriz([
+      "Categoria",
+      "Produto",
+      "Detalhes",
+      "Variação",
+      "Galão\r\n3,6 L",
+    ]);
+    expect(colunas.detalhes).toBe(2);
+    expect(colunas.variacao).toBe(3);
+    expect(colunas.embalagens).toEqual([{ indice: 4, embalagem: "Galão 3,6 L" }]);
+  });
+
+  it("sem coluna Variação no arquivo, continua funcionando como antes (variacao: null)", () => {
+    const colunas = detectarColunasMatriz(["Categoria", "Produto", "Detalhes", "Galão"]);
+    expect(colunas.variacao).toBeNull();
+    expect(colunas.embalagens.map((e) => e.indice)).toEqual([3]);
+  });
 });
 
 describe("analisarLinhas — detecção de formato", () => {
@@ -249,5 +268,66 @@ describe("converter — formato matriz (molde oficial da tabela de preços)", ()
   it("avisa quando a linha não tem nome de produto", () => {
     const { ignorados } = converter(planilha);
     expect(ignorados).toContainEqual({ linha: 6, motivo: "Sem nome de produto" });
+  });
+});
+
+describe("converter — matriz com coluna Variação (tamanho/tipo, independente de Detalhes)", () => {
+  // "Arenito glitz" tem preço fixo por embalagem, mas 3 variações de tamanho —
+  // cada uma vira uma linha própria na planilha, todas com o mesmo preço.
+  const cabecalho = ["Categoria", "Produto", "Detalhes", "Galão\r\n3,6 L", "Lata\r\n18 L", "Variação"];
+  const planilha = analisarLinhas([
+    cabecalho,
+    ["Texturas", "Arenito glitz", "base clara/escura e cores", 126.58, 565.2, "fino"],
+    ["Texturas", "Arenito glitz", "base clara/escura e cores", 126.58, 565.2, "médio"],
+    ["Esmaltes", "Esmalte sintético brilhante", "", 95.64, 453.31, ""],
+  ]);
+
+  it("detecta a coluna Variação e não a trata como embalagem", () => {
+    expect(planilha.formato).toBe("matriz");
+    expect(planilha.colunasMatriz.variacao).toBe(5);
+    expect(planilha.colunasMatriz.embalagens.map((e) => e.embalagem)).toEqual([
+      "Galão 3,6 L",
+      "Lata 18 L",
+    ]);
+  });
+
+  it("inclui a variação em cada entrada gerada, sem mexer em detalhes", () => {
+    const { produtos, ignorados } = converter(planilha);
+    expect(produtos).toEqual([
+      {
+        nome: "Arenito glitz",
+        detalhes: "base clara/escura e cores",
+        variacao: "fino",
+        embalagem: "Galão 3,6 L",
+        valorUnit: 126.58,
+      },
+      {
+        nome: "Arenito glitz",
+        detalhes: "base clara/escura e cores",
+        variacao: "fino",
+        embalagem: "Lata 18 L",
+        valorUnit: 565.2,
+      },
+      {
+        nome: "Arenito glitz",
+        detalhes: "base clara/escura e cores",
+        variacao: "médio",
+        embalagem: "Galão 3,6 L",
+        valorUnit: 126.58,
+      },
+      {
+        nome: "Arenito glitz",
+        detalhes: "base clara/escura e cores",
+        variacao: "médio",
+        embalagem: "Lata 18 L",
+        valorUnit: 565.2,
+      },
+      { nome: "Esmalte sintético brilhante", embalagem: "Galão 3,6 L", valorUnit: 95.64 },
+      { nome: "Esmalte sintético brilhante", embalagem: "Lata 18 L", valorUnit: 453.31 },
+    ]);
+    // Nenhum aviso de "valor inválido" pra coluna Variação (regressão: antes de
+    // detectá-la como coluna própria, "fino"/"médio" caíam no loop de embalagem
+    // e o importador tentava ler como preço).
+    expect(ignorados).toEqual([]);
   });
 });

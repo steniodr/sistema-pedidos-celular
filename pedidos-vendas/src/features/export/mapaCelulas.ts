@@ -1,10 +1,11 @@
 import type { DadosExportacao } from "./dadosExportacao";
 
 /**
- * Tradução campo → célula do modelo oficial (.xlsx), mapeada a partir do arquivo
- * real `public/templates/modelo_pedido.xlsx`, aba "Pedido" (a aba com o rodapé de
- * 4 colunas — Forma de solicitação / Data / Representante / Valor do pedido —
- * usado para os dois modelos MERKO/ARARA AZUL).
+ * Tradução campo → célula do modelo oficial (.xlsx), mapeada a partir dos arquivos
+ * reais `public/templates/modelo_pedido_30.xlsx` e `modelo_pedido_70.xlsx`
+ * (mesmo layout de célula nos dois — só a quantidade de linhas de item muda),
+ * aba "Pedido" (a aba com o rodapé de 4 colunas — Forma de solicitação / Data /
+ * Representante / Valor do pedido — usado para os dois modelos MERKO/ARARA AZUL).
  *
  * ⚠ Este é o ÚNICO arquivo que conhece endereços de célula. Sempre a célula MESTRE
  * de cada intervalo mesclado — escrever numa célula não-mestre não dá erro no

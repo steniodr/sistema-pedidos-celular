@@ -36,6 +36,11 @@ export interface Produto {
   nome: string;
   /** Variante/observação da tabela de preços (ex.: "exceto amarelo, laranja e vermelho"). */
   detalhes?: string;
+  /**
+   * Variação de tamanho/tipo que não muda o preço (ex.: "#08", "médio") —
+   * independente de `detalhes`, some ao nome no Excel/PDF exportado.
+   */
+  variacao?: string;
   embalagem: string;
   valorUnit: number;
   /** Nome do arquivo de onde o produto veio, para rastreabilidade. */
@@ -53,6 +58,8 @@ export interface ItemPedido {
   /** Nome do produto isolado, sem detalhes — usado para reabrir o fluxo guiado ao editar o item. */
   nomeProduto?: string;
   detalhesProduto?: string;
+  /** Variação de tamanho/tipo escolhida (ver `Produto.variacao`) — some ao nome na exportação. */
+  variacaoProduto?: string;
   cor?: string;
   padraoComplemento?: string;
   /** Campo livre do vendedor, não vai para a coluna de descrição do produto. */

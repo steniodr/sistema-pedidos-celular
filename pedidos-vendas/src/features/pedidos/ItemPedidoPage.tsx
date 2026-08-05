@@ -32,6 +32,10 @@ export function ItemPedidoPage() {
   const [variantes, setVariantes] = useState<Produto[]>([]);
   const [detalheEscolhido, setDetalheEscolhido] = useState<string | null>(null);
 
+  // Etapa 2b: variação (tamanho/tipo, ex.: "#08", "médio") — independente de
+  // detalhes, só quando o grupo de detalhes escolhido tem mais de uma.
+  const [variacaoEscolhida, setVariacaoEscolhida] = useState<string | null>(null);
+
   // Etapa 3: embalagem.
   const [embalagem, setEmbalagem] = useState("");
   const [embalagemOutro, setEmbalagemOutro] = useState(false);
@@ -54,6 +58,7 @@ export function ItemPedidoPage() {
         setBusca(nome);
         setNomeConfirmado(nome);
         setDetalheEscolhido(existente.detalhesProduto ?? "");
+        setVariacaoEscolhida(existente.variacaoProduto ?? "");
         setEmbalagem(existente.embalagem);
         setCor(existente.cor ?? "");
         setPadraoComplemento(existente.padraoComplemento ?? "");
@@ -87,18 +92,38 @@ export function ItemPedidoPage() {
     setEmbalagemOutro(false);
     setValorTexto("");
     setDetalheEscolhido(null);
+    setVariacaoEscolhida(null);
     setVariantes([]);
 
     const lista = await repo.listarVariantesPorNome(nome);
     setVariantes(lista);
     const grupos = [...new Set(lista.map((v) => v.detalhes ?? ""))];
-    setDetalheEscolhido(grupos.length <= 1 ? (grupos[0] ?? "") : null);
+    if (grupos.length <= 1) {
+      resolverVariante(grupos[0] ?? "", lista);
+    } else {
+      setDetalheEscolhido(null);
+      setVariacaoEscolhida(null);
+    }
+  }
+
+  // Resolve a variante (detalhes) escolhida e, a partir dela, já auto-resolve
+  // a variação (tamanho/tipo) quando o grupo tiver só uma — ou deixa null pra
+  // pedir escolha, mesmo padrão de `escolherNome` acima pra detalhes.
+  function resolverVariante(detalhe: string, listaVariantes: Produto[]) {
+    setDetalheEscolhido(detalhe);
+    const gruposVariacao = [
+      ...new Set(
+        listaVariantes.filter((v) => (v.detalhes ?? "") === detalhe).map((v) => v.variacao ?? ""),
+      ),
+    ];
+    setVariacaoEscolhida(gruposVariacao.length <= 1 ? (gruposVariacao[0] ?? "") : null);
   }
 
   function campoNomeAlterado(valor: string) {
     setBusca(valor);
     setNomeConfirmado(null);
     setDetalheEscolhido(null);
+    setVariacaoEscolhida(null);
     setEmbalagem("");
     setEmbalagemOutro(false);
     setVariantes([]);
@@ -111,13 +136,30 @@ export function ItemPedidoPage() {
 
   const precisaEscolherVariante = gruposDetalhes.length > 1 && detalheEscolhido === null;
 
-  // Etapa 3 — embalagens disponíveis para a variante escolhida.
-  const opcoesEmbalagem = useMemo(() => {
+  const gruposVariacao = useMemo(() => {
     if (detalheEscolhido === null) return [];
-    return (variantes ?? [])
-      .filter((v) => (v.detalhes ?? "") === detalheEscolhido && v.embalagem)
-      .map((v) => ({ embalagem: v.embalagem, valorUnit: v.valorUnit }));
+    return [
+      ...new Set(
+        variantes.filter((v) => (v.detalhes ?? "") === detalheEscolhido).map((v) => v.variacao ?? ""),
+      ),
+    ];
   }, [variantes, detalheEscolhido]);
+
+  const precisaEscolherVariacao =
+    !precisaEscolherVariante && gruposVariacao.length > 1 && variacaoEscolhida === null;
+
+  // Etapa 3 — embalagens disponíveis para a variante/variação escolhidas.
+  const opcoesEmbalagem = useMemo(() => {
+    if (detalheEscolhido === null || precisaEscolherVariacao) return [];
+    return (variantes ?? [])
+      .filter(
+        (v) =>
+          (v.detalhes ?? "") === detalheEscolhido &&
+          (v.variacao ?? "") === (variacaoEscolhida ?? "") &&
+          v.embalagem,
+      )
+      .map((v) => ({ embalagem: v.embalagem, valorUnit: v.valorUnit }));
+  }, [variantes, detalheEscolhido, variacaoEscolhida, precisaEscolherVariacao]);
 
   function escolherEmbalagem(valor: string) {
     if (valor === OUTRO) {
@@ -154,7 +196,8 @@ export function ItemPedidoPage() {
     qtd > 0 &&
     embalagem.trim().length > 0 &&
     valorUnit > 0 &&
-    !precisaEscolherVariante;
+    !precisaEscolherVariante &&
+    !precisaEscolherVariacao;
 
   async function salvar() {
     if (!pedido || !valido) return;
@@ -169,6 +212,7 @@ export function ItemPedidoPage() {
         descricaoProduto: detalhesFinal ? `${nomeFinal} (${detalhesFinal})` : nomeFinal,
         nomeProduto: nomeFinal,
         detalhesProduto: detalhesFinal || undefined,
+        variacaoProduto: variacaoEscolhida || undefined,
         cor: cor || undefined,
         padraoComplemento: padraoComplemento || undefined,
         descricao: descricaoLivre || undefined,
@@ -245,7 +289,7 @@ export function ItemPedidoPage() {
                 key={detalhe}
                 type="button"
                 className={css.buscaResultado}
-                onClick={() => setDetalheEscolhido(detalhe)}
+                onClick={() => resolverVariante(detalhe, variantes)}
               >
                 <span>{detalhe || "Padrão"}</span>
               </button>
@@ -256,7 +300,27 @@ export function ItemPedidoPage() {
 
       {detalheEscolhido && <Input rotulo="Detalhes" value={detalheEscolhido} readOnly />}
 
-      {nomeConfirmado && !precisaEscolherVariante && opcoesEmbalagem.length > 0 && (
+      {precisaEscolherVariacao && (
+        <div className="pilha pilha--apertada">
+          <span className="secao-titulo">Qual variação?</span>
+          <div className={css.buscaProduto}>
+            {gruposVariacao.map((variacao) => (
+              <button
+                key={variacao}
+                type="button"
+                className={css.buscaResultado}
+                onClick={() => setVariacaoEscolhida(variacao)}
+              >
+                <span>{variacao || "Padrão"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {variacaoEscolhida && <Input rotulo="Variação" value={variacaoEscolhida} readOnly />}
+
+      {nomeConfirmado && !precisaEscolherVariante && !precisaEscolherVariacao && opcoesEmbalagem.length > 0 && (
         <div className="pilha pilha--apertada">
           <span className="secao-titulo">
             Embalagem<span className="texto-erro"> *</span>
@@ -270,7 +334,12 @@ export function ItemPedidoPage() {
         </div>
       )}
 
-      {(embalagemOutro || (nomeConfirmado && !precisaEscolherVariante && opcoesEmbalagem.length === 0) || !nomeConfirmado) && (
+      {(embalagemOutro ||
+        (nomeConfirmado &&
+          !precisaEscolherVariante &&
+          !precisaEscolherVariacao &&
+          opcoesEmbalagem.length === 0) ||
+        !nomeConfirmado) && (
         <Input
           rotulo="Embalagem"
           obrigatorio

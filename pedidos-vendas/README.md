@@ -43,7 +43,7 @@ src/
 | O que | Onde |
 |---|---|
 | Mapeamento de campos do Excel oficial | `src/features/export/mapaCelulas.ts` (único arquivo que conhece endereços de célula) |
-| Modelo `.xlsx` oficial | `public/templates/modelo_pedido.xlsx` — veja o LEIA-ME da pasta |
+| Modelos `.xlsx` oficiais | `public/templates/modelo_pedido_30.xlsx` (até 30 itens) e `modelo_pedido_70.xlsx` (31 a 70 itens) — veja o LEIA-ME da pasta |
 | Formato de importação da base de produtos | `src/features/produtos/importarPlanilha.ts` |
 | Formato de importação da base de clientes | `src/features/clientes/importarClientesPlanilha.ts` (aliases de coluna por campo — ajustar se o molde da planilha mudar) |
 | Detecção de coluna por planilha (compartilhada entre os dois importadores acima) | `src/domain/planilha.ts` |
@@ -61,9 +61,14 @@ Detalhes) e uma coluna por embalagem (Galão, Lata, Tambor…), com o preço na 
 automaticamente e explode cada linha em uma combinação produto+embalagem por
 coluna preenchida. Também aceita, como alternativa, uma lista simples de 3 colunas
 (descrição, embalagem, valor) — o detector escolhe o formato pelo número de
-colunas do cabeçalho. Produto tem `nome` e `detalhes` (variante) separados no
-banco; ao montar o pedido, se um nome tiver mais de uma variante (`detalhes`
-diferente), o vendedor escolhe qual antes de ver embalagem/preço.
+colunas do cabeçalho. Produto tem `nome`, `detalhes` (variante/observação, ex.:
+diferença de preço por cor) e `variacao` (tamanho/tipo que **não** muda o
+preço, ex.: "#08", "médio") separados no banco — `detalhes` nunca aparece na
+exportação, `variacao` aparece somada ao nome quando o item tiver uma (ver
+"Exportação em Excel" abaixo). Ao montar o pedido, se um nome tiver mais de
+uma variante (`detalhes` diferente) e/ou mais de uma variação, o vendedor
+escolhe qual antes de ver embalagem/preço — cada etapa só aparece quando o
+produto realmente tem mais de uma opção.
 
 ### Importação da base de clientes
 
@@ -86,40 +91,52 @@ filtra nem bloqueia nada.
 
 ### Exportação em Excel — como o app se adapta ao molde oficial
 
-`public/templates/modelo_pedido.xlsx` (aba "Pedido") é a fonte de verdade do
-layout. O app **não usa endereços de linha fixos** para o bloco de itens: ele
-escaneia a coluna A a partir da primeira linha de item procurando o texto
-"Subtotal" (que já vem nativo no molde, junto com "Desconto" logo abaixo) e
-calcula a partir daí a capacidade de produtos e a posição do rodapé (Forma de
-solicitação / Data / Representante / Valor do pedido). Isso significa que
-aumentar ou diminuir a tabela de itens no arquivo `.xlsx` **não exige alterar o
-código** — só o número de linhas hardcoded como fallback em `mapaCelulas.ts`
-(`ultimaLinhaFallback`), usado apenas se a busca por "Subtotal" falhar.
+Há dois arquivos de molde: `public/templates/modelo_pedido_30.xlsx` (pedidos
+com até 30 itens) e `modelo_pedido_70.xlsx` (31 a 70 itens), ambos na aba
+"Pedido" — juntos, são a fonte de verdade do layout. `gerarExcel`
+(`caminhoModeloPara` em `src/features/export/excel.ts`) escolhe qual dos dois
+carregar pela quantidade de itens do pedido; existem dois arquivos em vez de
+um só porque o ExcelJS não permite duplicar linha com segurança (ver abaixo),
+então cada faixa de tamanho já vem com a quantidade de linhas de item pronta.
 
-Se o pedido tiver mais produtos do que a capacidade do molde, o app não tenta
-duplicar linha nele — o ExcelJS não realoca mesclagens já existentes abaixo do
-ponto de inserção (o rodapé e o bloco de revisão do molde ficariam presos no
-lugar antigo), e isso nem sempre lança exceção, às vezes só redireciona a
-escrita para a célula errada em silêncio. Nesse caso, o app cai automaticamente
-no gerador alternativo (`construirDoZero`, monta uma planilha equivalente do
+Dentro de cada arquivo, o app **não usa endereços de linha fixos** para o
+bloco de itens: ele escaneia a coluna A a partir da primeira linha de item
+procurando o texto "Subtotal" (que já vem nativo no molde, junto com
+"Desconto" logo abaixo) e calcula a partir daí a capacidade de produtos e a
+posição do rodapé (Forma de solicitação / Data / Representante / Valor do
+pedido). Isso significa que aumentar ou diminuir a tabela de itens em um dos
+arquivos `.xlsx` **não exige alterar o código** — só o número de linhas
+hardcoded como fallback em `mapaCelulas.ts` (`ultimaLinhaFallback`), usado
+apenas se a busca por "Subtotal" falhar.
+
+Se o pedido tiver mais produtos do que a capacidade do molde escolhido (hoje,
+mais de 70 — além do que o maior dos dois comporta), o app não tenta duplicar
+linha nele — o ExcelJS não realoca mesclagens já existentes abaixo do ponto de
+inserção (o rodapé e o bloco de revisão do molde ficariam presos no lugar
+antigo), e isso nem sempre lança exceção, às vezes só redireciona a escrita
+para a célula errada em silêncio. Nesse caso, o app cai automaticamente no
+gerador alternativo (`construirDoZero`, monta uma planilha equivalente do
 zero), o mesmo usado quando o arquivo do molde não está disponível.
 
-O `.xlsx` do molde fica **fora do precache do service worker** de propósito —
-só o bundle do app é precacheado. O molde é buscado com `NetworkFirst` (sempre
-tenta a rede primeiro; só usa cache quando genuinamente offline), para que
-trocar o arquivo em produção não fique preso atrás de um service worker antigo.
-Por isso `src/main.tsx` já dispara uma busca do molde assim que o app abre
-(não só na hora de exportar), pra maximizar a chance de já estar em cache
-quando o vendedor for exportar sem internet depois. Quando mesmo assim a
-exportação cai no gerador alternativo — molde indisponível ou pedido com mais
-itens do que a capacidade do molde — `gerarExcel` (`src/features/export/excel.ts`)
+Os `.xlsx` dos moldes ficam **fora do precache do service worker** de
+propósito — só o bundle do app é precacheado. Cada molde é buscado com
+`NetworkFirst` (sempre tenta a rede primeiro; só usa cache quando genuinamente
+offline), para que trocar os arquivos em produção não fique preso atrás de um
+service worker antigo. Por isso `src/main.tsx` já dispara uma busca dos dois
+moldes assim que o app abre (não só na hora de exportar), pra maximizar a
+chance de já estarem em cache quando o vendedor for exportar sem internet
+depois. Quando mesmo assim a exportação cai no gerador alternativo — molde
+indisponível ou pedido com mais itens do que a capacidade do maior molde —
+`gerarExcel` (`src/features/export/excel.ts`)
 devolve o motivo (`usouModelo`/`motivoFallback`) e `FinalizarPedidoPage` mostra
 um toast explicando qual dos dois casos aconteceu, em vez de só dizer "Excel
 gerado." sem indicar qual modelo foi usado.
 
-Os arquivos exportados (Excel e PDF) mostram só o **nome** do produto, sem a
-variante/detalhes — esses ficam visíveis dentro do app (tela do pedido, resumo)
-mas não vazam para o arquivo final.
+Os arquivos exportados (Excel e PDF) mostram o **nome** do produto seguido da
+**variação** de tamanho/tipo quando o item tiver uma (ex.: "Arenito glitz
+médio") — `detalhes` (a variante de preço, ex.: diferença de cor) nunca
+aparece; fica visível só dentro do app (tela do pedido, resumo). A composição
+final é feita em `montarDadosExportacao` (`src/features/export/dadosExportacao.ts`).
 
 ### Atualização do service worker (PWA)
 
@@ -139,8 +156,11 @@ o registro não é mais o script injetado automaticamente pelo plugin.
 Fases 1 e 2 da especificação original estão implementadas, mais uma rodada
 extensa de ajustes pedidos após uso real do app:
 
-**Clientes** — cadastro com validação de CPF/CNPJ (bloqueia finalizar pedido, não
-bloqueia rascunho), condição de pagamento como lista fixa (42 opções) com opção
+**Clientes** — cadastro com CPF/CNPJ **opcional** (útil pra cadastrar cliente
+ainda em fase de orçamento, com o documento capturado depois); quando
+preenchido, é validado por dígito verificador e bloqueia finalizar/exportar o
+pedido se for inválido — nunca bloqueia por estar vazio, nem impede salvar o
+rascunho do cadastro. Condição de pagamento como lista fixa (42 opções) com opção
 "Outro", lista com ícone de edição, busca com debounce, ordenação (Nome/Recentes),
 clientes de teste (Configurações, marcados e removíveis de uma vez, ver
 "Backup" abaixo), **importação em lote por planilha** (upsert
@@ -153,7 +173,11 @@ avisa quantos pedidos ficam sem o nome do cliente antes de confirmar, e oferece
 (criar/editar/excluir produto na mão, com "Desfazer", além da importação),
 ordenação (Nome/Valor), indicador de base desatualizada (verde ≤30 dias, amarelo
 30–90, vermelho >90 — acima de 90 dias exige uma confirmação extra ao finalizar
-o pedido, mas nunca bloqueia).
+o pedido, mas nunca bloqueia). Campo Variação (tamanho/tipo, ex.: "#08",
+"médio") opcional e independente de Detalhes — usado hoje pelas famílias
+Textura rústica/arranhado e Arenito (glitz, especial); quando um produto tem
+mais de uma variação, o vendedor escolhe qual ao montar o item, e o valor
+escolhido some ao nome no Excel/PDF exportado.
 
 **Pedido** — marca em texto livre e data do pedido (editável em Finalizar; o
 horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
@@ -213,7 +237,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.5`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.6`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -221,8 +245,8 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-155 testes automatizados (`npm test`), incluindo testes contra o arquivo real do
-molde Excel (`excel.modelo.test.ts`) e da base de clientes real.
+165 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
+dos moldes Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo
 maior. Cobertura de teste de tela para o fluxo de pedido (Finalizar, exclusão)

@@ -1,6 +1,8 @@
 /**
  * Validação de CPF/CNPJ por dígito verificador, 100% client-side (especificação 6.2).
- * O pedido não pode ser finalizado com documento inválido, mas o rascunho pode ser salvo.
+ * O documento é opcional (ex.: cliente cadastrado ainda em fase de orçamento, sem o
+ * dado à mão) — cadastro e finalização do pedido só são bloqueados quando o campo
+ * foi preenchido com algo que não é um CPF/CNPJ válido, nunca por estar vazio.
  */
 
 export function somenteDigitos(valor: string): string {

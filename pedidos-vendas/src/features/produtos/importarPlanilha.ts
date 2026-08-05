@@ -12,10 +12,12 @@ import type { EntradaProduto } from "../../data/repository";
  * Leitura do arquivo de atualização da base de produtos (especificação 7).
  *
  * O molde oficial ("Tabela_Preco_Estruturada.xlsx") é uma MATRIZ: cada linha é um
- * produto (Categoria, Produto, Detalhes) e cada coluna seguinte é uma embalagem
- * (ex.: "Galão 3,6 L", "Lata 18 L"), com o preço na célula — célula vazia significa
- * que aquela combinação não existe. O importador explode cada linha em uma entrada
- * por embalagem preenchida.
+ * produto (Categoria, Produto, Detalhes[, Variação]) e cada coluna seguinte é uma
+ * embalagem (ex.: "Galão 3,6 L", "Lata 18 L"), com o preço na célula — célula vazia
+ * significa que aquela combinação não existe. O importador explode cada linha em
+ * uma entrada por embalagem preenchida. A coluna "Variação" é opcional e
+ * independente de "Detalhes": tamanho/tipo que não muda o preço (ex.: "#08",
+ * "médio") — some ao nome do produto só na hora de exportar o pedido.
  *
  * Também aceita o formato simples de lista (uma linha por produto+embalagem, com
  * colunas fixas de descrição/embalagem/valor), caso um arquivo diferente apareça —
@@ -35,6 +37,8 @@ export interface ColunasMatriz {
   categoria: number | null;
   produto: number | null;
   detalhes: number | null;
+  /** Variação de tamanho/tipo que não muda preço (ex.: "#08", "médio") — coluna à parte de `detalhes`. */
+  variacao: number | null;
   embalagens: ColunaEmbalagem[];
 }
 
@@ -74,10 +78,10 @@ const ALIASES_DETALHES = [
   "observacao",
   "observacoes",
   "complemento",
-  "variacao",
   "especificacao",
   "cor",
 ];
+const ALIASES_VARIACAO = ["variacao", "variante", "tipo"];
 const ALIASES_EMBALAGEM = ["embalagem", "tamanho", "unidade", "medida", "volume", "envase"];
 const ALIASES_VALOR = [
   "valorunit",
@@ -102,14 +106,22 @@ export function detectarMapeamentoLista(cabecalho: string[]): MapeamentoLista {
 
 export function detectarColunasMatriz(
   cabecalho: string[],
-  fixas: { categoria?: number | null; produto?: number | null; detalhes?: number | null } = {},
+  fixas: {
+    categoria?: number | null;
+    produto?: number | null;
+    detalhes?: number | null;
+    variacao?: number | null;
+  } = {},
 ): ColunasMatriz {
   const chaves = cabecalhoNormalizado(cabecalho);
   const categoria = fixas.categoria !== undefined ? fixas.categoria : encontrarIndice(chaves, ALIASES_CATEGORIA);
   const produto = fixas.produto !== undefined ? fixas.produto : encontrarIndice(chaves, ALIASES_PRODUTO);
   const detalhes = fixas.detalhes !== undefined ? fixas.detalhes : encontrarIndice(chaves, ALIASES_DETALHES);
+  const variacao = fixas.variacao !== undefined ? fixas.variacao : encontrarIndice(chaves, ALIASES_VARIACAO);
 
-  const usados = new Set([categoria, produto, detalhes].filter((i): i is number => i !== null));
+  const usados = new Set(
+    [categoria, produto, detalhes, variacao].filter((i): i is number => i !== null),
+  );
   const embalagens: ColunaEmbalagem[] = [];
   cabecalho.forEach((titulo, indice) => {
     if (usados.has(indice)) return;
@@ -117,7 +129,7 @@ export function detectarColunasMatriz(
     if (embalagem) embalagens.push({ indice, embalagem });
   });
 
-  return { categoria, produto, detalhes, embalagens };
+  return { categoria, produto, detalhes, variacao, embalagens };
 }
 
 /**
@@ -155,7 +167,7 @@ export function analisarLinhas(linhas: unknown[][], limiteBusca = 15): PlanilhaL
     cabecalho: primeira,
     formato: "lista",
     mapeamentoLista: { descricaoProduto: null, embalagem: null, valorUnit: null },
-    colunasMatriz: { categoria: null, produto: null, detalhes: null, embalagens: [] },
+    colunasMatriz: { categoria: null, produto: null, detalhes: null, variacao: null, embalagens: [] },
   };
 }
 
@@ -218,6 +230,7 @@ function converterMatriz(planilha: PlanilhaLida, colunas: ColunasMatriz): Result
     }
 
     const detalhes = colunas.detalhes !== null ? textoDaCelula(linha[colunas.detalhes]) : "";
+    const variacao = colunas.variacao !== null ? textoDaCelula(linha[colunas.variacao]) : "";
 
     let algumPreco = false;
     for (const coluna of colunas.embalagens) {
@@ -238,6 +251,7 @@ function converterMatriz(planilha: PlanilhaLida, colunas: ColunasMatriz): Result
       produtos.push({
         nome: nomeProduto,
         detalhes: detalhes || undefined,
+        variacao: variacao || undefined,
         embalagem: coluna.embalagem,
         valorUnit: valor,
       });

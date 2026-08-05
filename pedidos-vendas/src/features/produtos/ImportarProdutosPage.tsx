@@ -69,13 +69,14 @@ export function ImportarProdutosPage() {
     }
   }
 
-  function ajustarColunaMatriz(campo: "categoria" | "produto" | "detalhes", valor: string) {
+  function ajustarColunaMatriz(campo: "categoria" | "produto" | "detalhes" | "variacao", valor: string) {
     if (!planilha) return;
     const indice = valor === "" ? null : Number(valor);
     const fixas = {
       categoria: colunasMatriz?.categoria ?? null,
       produto: colunasMatriz?.produto ?? null,
       detalhes: colunasMatriz?.detalhes ?? null,
+      variacao: colunasMatriz?.variacao ?? null,
       [campo]: indice,
     };
     setColunasMatriz(detectarColunasMatriz(planilha.cabecalho, fixas));
@@ -173,6 +174,19 @@ export function ImportarProdutosPage() {
                   </option>
                 ))}
               </Select>
+              <Select
+                rotulo="Variação"
+                ajuda="Coluna à parte de Detalhes, para tamanho/tipo que não muda o preço (ex.: “#08”, “médio”) — some ao nome no Excel/PDF exportado."
+                value={colunasMatriz.variacao ?? ""}
+                onChange={(e) => ajustarColunaMatriz("variacao", e.target.value)}
+              >
+                <option value="">— não usar —</option>
+                {colunas.map((nome, indice) => (
+                  <option key={indice} value={indice}>
+                    {nome || `Coluna ${indice + 1}`}
+                  </option>
+                ))}
+              </Select>
             </>
           )}
         </>
@@ -246,6 +260,7 @@ export function ImportarProdutosPage() {
                       <td>
                         {p.nome}
                         {p.detalhes ? ` (${p.detalhes})` : ""}
+                        {p.variacao ? ` · ${p.variacao}` : ""}
                       </td>
                       <td>{p.embalagem}</td>
                       <td>{formatarMoeda(p.valorUnit)}</td>

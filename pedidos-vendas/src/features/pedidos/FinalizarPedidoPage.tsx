@@ -39,8 +39,9 @@ export function FinalizarPedidoPage() {
   );
 
   useEffect(() => {
-    void modeloDisponivel().then(setTemModelo);
-  }, []);
+    if (!pedido) return;
+    void modeloDisponivel(pedido.itens.length).then(setTemModelo);
+  }, [pedido?.itens.length]);
 
   if (carregando) {
     return (
@@ -57,12 +58,14 @@ export function FinalizarPedidoPage() {
     );
   }
 
-  // Validações que impedem a exportação (especificação 6.2 e tela de finalização).
+  // Validações que impedem a exportação (tela de finalização). CPF/CNPJ é
+  // opcional (ex.: orçamento cujo documento ainda não foi capturado) — só
+  // bloqueia quando algo foi digitado e está errado, nunca por estar vazio.
   const pendencias: string[] = [];
   if (!cliente) pendencias.push("O pedido não tem cliente vinculado.");
   else {
     if (!cliente.nome.trim()) pendencias.push("O cliente está sem nome.");
-    if (!validarCpfCnpj(cliente.cpfCnpj)) {
+    if (cliente.cpfCnpj.trim() && !validarCpfCnpj(cliente.cpfCnpj)) {
       pendencias.push("O CPF/CNPJ do cliente é inválido — corrija no cadastro.");
     }
   }
@@ -251,8 +254,8 @@ export function FinalizarPedidoPage() {
       <h2 className="secao-titulo">Exportar</h2>
       {temModelo === false && (
         <p className="texto-suave">
-          O modelo oficial (public/templates/modelo_pedido.xlsx) ainda não está no
-          projeto — a planilha será gerada com o layout equivalente montado pelo app.
+          O modelo oficial ainda não está disponível neste aparelho — a planilha
+          será gerada com o layout equivalente montado pelo app.
         </p>
       )}
       <div className={css.exportacoes}>

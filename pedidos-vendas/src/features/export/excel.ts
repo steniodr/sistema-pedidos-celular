@@ -2,8 +2,20 @@ import type { Borders, Workbook, Worksheet } from "exceljs";
 import type { DadosExportacao } from "./dadosExportacao";
 import { MAPA_PADRAO, type MapaModelo } from "./mapaCelulas";
 
-const CAMINHO_MODELO = "/templates/modelo_pedido.xlsx";
+/**
+ * Dois moldes oficiais, um por faixa de tamanho do pedido — o Excel real não usa
+ * duplicação de linha (ver comentário grande abaixo), então cada faixa precisa do
+ * próprio arquivo com a quantidade de linhas de item já pronta.
+ */
+const LIMITE_ITENS_MODELO_30 = 30;
+const CAMINHO_MODELO_30 = "/templates/modelo_pedido_30.xlsx";
+const CAMINHO_MODELO_70 = "/templates/modelo_pedido_70.xlsx";
 const FORMATO_MOEDA = '"R$" #,##0.00';
+
+/** Pedido com até 30 itens usa o molde de 30 linhas; acima disso, o de 70. */
+function caminhoModeloPara(quantidadeItens: number): string {
+  return quantidadeItens <= LIMITE_ITENS_MODELO_30 ? CAMINHO_MODELO_30 : CAMINHO_MODELO_70;
+}
 
 /** Pedido tem mais itens do que o molde oficial comporta — força o gerador alternativo. */
 export class CapacidadeExcedidaError extends Error {}
@@ -25,23 +37,28 @@ export interface ResultadoExcel {
 /**
  * Gera o .xlsx do pedido.
  *
- * Caminho principal: carrega o modelo oficial de `public/templates/modelo_pedido.xlsx`
- * (precacheado pelo service worker, portanto disponível offline) e preenche as células
- * definidas em mapaCelulas.ts, preservando toda a formatação original.
+ * Caminho principal: carrega o modelo oficial (precacheado pelo service worker,
+ * portanto disponível offline) e preenche as células definidas em mapaCelulas.ts,
+ * preservando toda a formatação original. Existem dois arquivos de molde —
+ * `modelo_pedido_30.xlsx` (até 30 itens) e `modelo_pedido_70.xlsx` (31 a 70 itens) —
+ * porque o Excel real não duplica linha (ver comentário abaixo), então cada faixa de
+ * tamanho precisa do próprio arquivo já com a quantidade de linhas de item pronta.
+ * `caminhoModeloPara` escolhe qual dos dois usar a partir do número de itens do pedido.
  *
  * Enquanto o modelo oficial não estiver no projeto, cai no gerador próprio, que monta
  * uma planilha equivalente do zero — mesmo cabeçalho, mesmas colunas e mesmo rodapé.
  *
- * O bloco de itens não tem tamanho fixo no código — `preencherModelo` localiza a
- * linha "Subtotal" de verdade dentro do arquivo (ver mapaCelulas.ts) e calcula a
- * capacidade a partir daí, então o app se adapta sozinho quando o molde muda de
- * tamanho. Se o pedido tiver mais produtos do que essa capacidade, cai no gerador
- * próprio em vez de tentar duplicar linha: o ExcelJS não realoca as mesclagens já
- * existentes abaixo do ponto de inserção (rodapé, Subtotal/Desconto e o bloco de
- * revisão do molde ficariam "presos" no lugar antigo), e isso nem sempre lança
- * exceção — às vezes só redireciona a escrita pra célula errada em silêncio. Por
- * isso `preencherModelo` verifica a capacidade e lança ANTES de escrever qualquer
- * coisa, para o fallback abaixo sempre partir de um estado limpo.
+ * Dentro de cada arquivo, o bloco de itens não tem tamanho fixo no código —
+ * `preencherModelo` localiza a linha "Subtotal" de verdade dentro do arquivo (ver
+ * mapaCelulas.ts) e calcula a capacidade a partir daí, então o app se adapta sozinho
+ * quando um dos moldes muda de tamanho. Se o pedido tiver mais produtos do que essa
+ * capacidade (ex.: mais de 70 itens, além do que o maior molde comporta), cai no
+ * gerador próprio em vez de tentar duplicar linha: o ExcelJS não realoca as
+ * mesclagens já existentes abaixo do ponto de inserção (rodapé, Subtotal/Desconto e
+ * o bloco de revisão do molde ficariam "presos" no lugar antigo), e isso nem sempre
+ * lança exceção — às vezes só redireciona a escrita pra célula errada em silêncio.
+ * Por isso `preencherModelo` verifica a capacidade e lança ANTES de escrever
+ * qualquer coisa, para o fallback abaixo sempre partir de um estado limpo.
  */
 export async function gerarExcel(
   dados: DadosExportacao,
@@ -49,7 +66,7 @@ export async function gerarExcel(
 ): Promise<ResultadoExcel> {
   // ExcelJS é pesado e só é usado na exportação: carrega sob demanda.
   const { default: ExcelJS } = await import("exceljs");
-  const modelo = await carregarModelo();
+  const modelo = await carregarModelo(caminhoModeloPara(dados.itens.length));
 
   let workbook: Workbook;
   let usouModelo = false;
@@ -75,18 +92,31 @@ export async function gerarExcel(
   return { blob, usouModelo, motivoFallback };
 }
 
-/** `true` quando o modelo oficial está presente; a tela usa isso para avisar o vendedor. */
-export async function modeloDisponivel(): Promise<boolean> {
-  return (await carregarModelo()) !== null;
+/**
+ * `true` quando o modelo oficial que seria usado para `quantidadeItens` está
+ * presente; a tela usa isso para avisar o vendedor. Sem argumento, checa o molde
+ * de 30 (o caso mais comum) — usado no aquecimento de cache em `main.tsx`, antes
+ * de saber o tamanho de nenhum pedido específico.
+ */
+export async function modeloDisponivel(quantidadeItens = 0): Promise<boolean> {
+  return (await carregarModelo(caminhoModeloPara(quantidadeItens))) !== null;
 }
 
-async function carregarModelo(): Promise<ArrayBuffer | null> {
+/**
+ * Aquece o cache dos DOIS moldes assim que o app abre (ver `main.tsx`), já que
+ * ainda não se sabe o tamanho do pedido que o vendedor vai exportar depois.
+ */
+export async function aquecerCacheModelos(): Promise<void> {
+  await Promise.all([carregarModelo(CAMINHO_MODELO_30), carregarModelo(CAMINHO_MODELO_70)]);
+}
+
+async function carregarModelo(caminho: string): Promise<ArrayBuffer | null> {
   try {
     // Sem cache do navegador: o arquivo é editado com frequência durante os
     // testes, e o cache HTTP padrão poderia continuar servindo uma versão antiga
     // mesmo depois de trocar o arquivo (além do ajuste equivalente no service
     // worker, em vite.config.ts).
-    const resposta = await fetch(CAMINHO_MODELO, { cache: "no-store" });
+    const resposta = await fetch(caminho, { cache: "no-store" });
     if (!resposta.ok) return null;
     const buffer = await resposta.arrayBuffer();
     // Um 404 servido como index.html chega aqui como HTML; .xlsx começa com "PK".

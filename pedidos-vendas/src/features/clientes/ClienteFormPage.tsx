@@ -77,11 +77,12 @@ export function ClienteFormPage() {
     const nomeOk = form.nome.trim().length > 0;
     setErroNome(nomeOk ? undefined : "Informe o nome do cliente.");
 
-    const documentoOk = validarCpfCnpj(form.cpfCnpj);
+    // Documento é opcional (ex.: cliente cadastrado ainda em fase de orçamento,
+    // documento capturado depois) — só valida quando algo foi digitado. Nome é
+    // o mínimo para identificar o cliente.
+    const documentoOk = !form.cpfCnpj.trim() || validarCpfCnpj(form.cpfCnpj);
     setErroDocumento(documentoOk ? undefined : "CPF/CNPJ inválido.");
 
-    // Documento inválido não impede salvar o cadastro; só bloqueia a finalização
-    // do pedido (especificação 6.2). Nome é o mínimo para identificar o cliente.
     if (!nomeOk) return;
 
     setSalvando(true);
@@ -137,7 +138,6 @@ export function ClienteFormPage() {
       />
       <Input
         rotulo="CPF / CNPJ"
-        obrigatorio
         inputMode="numeric"
         value={mascararCpfCnpj(form.cpfCnpj)}
         erro={erroDocumento}
@@ -149,7 +149,7 @@ export function ClienteFormPage() {
               : "CPF/CNPJ inválido.",
           )
         }
-        ajuda="Validado ao sair do campo. O pedido só é finalizado com documento válido."
+        ajuda="Opcional — útil quando o dado ainda não foi capturado (ex.: orçamento). Se preenchido, é validado ao sair do campo."
       />
       <Input
         rotulo="Nome fantasia"

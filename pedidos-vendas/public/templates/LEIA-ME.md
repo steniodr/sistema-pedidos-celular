@@ -1,14 +1,21 @@
 # Modelo de Excel do pedido
 
-O arquivo do molde oficial fica aqui, com o nome exato:
+Os arquivos do molde oficial ficam aqui, com os nomes exatos:
 
-    modelo_pedido.xlsx
+    modelo_pedido_30.xlsx   (pedidos com até 30 itens)
+    modelo_pedido_70.xlsx   (pedidos com 31 a 70 itens)
 
-na aba **"Pedido"**. O app carrega esse arquivo ao exportar, preenche as células
-e preserva toda a formatação original (bordas, mesclagens) — exceto a fórmula
-da coluna de total dos itens (ver linha 42 abaixo: fórmula compartilhada nessa
-coluna corrompia o arquivo ao serializar pedidos com mais de 2 itens; o app
-grava o valor já calculado ali em vez de tentar preservar a fórmula).
+ambos na aba **"Pedido"**. O app escolhe qual dos dois carregar pela
+quantidade de itens do pedido (`caminhoModeloPara` em `src/features/export/excel.ts`):
+até 30 itens usa o molde de 30; acima disso, o de 70. Isso existe porque o
+Excel real não duplica linha (ver LEIA-ME abaixo) — cada faixa de tamanho
+precisa do próprio arquivo já com a quantidade de linhas de item pronta.
+
+O app preenche as células e preserva toda a formatação original (bordas,
+mesclagens) — exceto a fórmula da coluna de total dos itens (ver linha abaixo:
+fórmula compartilhada nessa coluna corrompia o arquivo ao serializar pedidos
+com mais de 2 itens; o app grava o valor já calculado ali em vez de tentar
+preservar a fórmula).
 
 **Este arquivo fica fora do precache do service worker de propósito.** Ele é
 buscado com a estratégia `NetworkFirst` (sempre tenta a rede primeiro; só usa a
@@ -19,18 +26,19 @@ worker antigo instalado no navegador. Se mesmo assim continuar aparecendo a
 versão anterior, é cache do próprio navegador: dê um Ctrl+Shift+R (ou limpe os
 dados do site) uma vez.
 
-**Enquanto o arquivo não estiver aqui** (ou se tiver mais produtos do que o
-molde comporta), a exportação continua funcionando: o app monta uma planilha
-equivalente do zero (mesmo cabeçalho, mesmas colunas, mesmo rodapé).
+**Enquanto o arquivo certo não estiver aqui** (ou se o pedido tiver mais
+produtos do que os 70 que o maior molde comporta), a exportação continua
+funcionando: o app monta uma planilha equivalente do zero (mesmo cabeçalho,
+mesmas colunas, mesmo rodapé).
 
-## A tabela de itens pode mudar de tamanho livremente
+## A tabela de itens de cada arquivo pode mudar de tamanho livremente
 
-O app **não usa números de linha fixos** para achar onde a tabela de itens
-termina. Ele escaneia a coluna A a partir da primeira linha de item (11)
-procurando o texto "Subtotal" — que já vem nativo no molde, mesclado A:G com o
-valor em H, e a linha "Desconto" logo abaixo no mesmo formato — e calcula a
-posição do rodapé (Forma de solicitação / Data / Representante / Valor do
-pedido) a partir daí.
+Para cada um dos dois arquivos, o app **não usa números de linha fixos** para
+achar onde a tabela de itens termina. Ele escaneia a coluna A a partir da
+primeira linha de item (11) procurando o texto "Subtotal" — que já vem nativo
+no molde, mesclado A:G com o valor em H, e a linha "Desconto" logo abaixo no
+mesmo formato — e calcula a posição do rodapé (Forma de solicitação / Data /
+Representante / Valor do pedido) a partir daí.
 
 **Ou seja: para aumentar ou diminuir a quantidade de linhas de item, basta
 editar a planilha.** Não precisa avisar para ajustar código, desde que a

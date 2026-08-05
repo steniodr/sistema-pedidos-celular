@@ -11,7 +11,7 @@ import { lerNumeroBR } from "../../domain/calculos";
 import { mensagemErro } from "../../domain/erros";
 import type { EntradaProdutoUnico } from "../../data/repository";
 
-const VAZIO: EntradaProdutoUnico = { nome: "", detalhes: "", embalagem: "", valorUnit: 0 };
+const VAZIO: EntradaProdutoUnico = { nome: "", detalhes: "", variacao: "", embalagem: "", valorUnit: 0 };
 
 export function ProdutoFormPage() {
   const repo = useRepository();
@@ -54,6 +54,7 @@ export function ProdutoFormPage() {
         id,
         nome: form.nome.trim(),
         detalhes: form.detalhes?.trim() || undefined,
+        variacao: form.variacao?.trim() || undefined,
         valorUnit: lerNumeroBR(valorTexto) ?? 0,
       });
       toast.sucesso("Produto salvo.");
@@ -101,6 +102,12 @@ export function ProdutoFormPage() {
         value={form.detalhes ?? ""}
         onChange={(e) => campo("detalhes", e.target.value)}
         ajuda="Variação/observação da tabela de preços (opcional)."
+      />
+      <Input
+        rotulo="Variação"
+        value={form.variacao ?? ""}
+        onChange={(e) => campo("variacao", e.target.value)}
+        ajuda="Tamanho/tipo que não muda o preço (ex.: “#08”, “médio”) — some ao nome no Excel/PDF exportado (opcional)."
       />
       <Input
         rotulo="Embalagem"

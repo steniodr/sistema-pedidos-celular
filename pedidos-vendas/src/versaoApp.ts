@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.5";
+export const VERSAO_APP = "1.6";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,15 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.6",
+    data: "2026-08-05",
+    itens: [
+      "Exportar Excel: molde oficial agora é escolhido pelo tamanho do pedido — até 30 itens usa modelo_pedido_30.xlsx, de 31 a 70 usa modelo_pedido_70.xlsx (antes era um arquivo só, com capacidade fixa)",
+      "Base de produtos: novo campo Variação (tamanho/tipo, ex.: “#08”, “médio”), independente de Detalhes — Textura rústica/arranhado e as famílias de Arenito (glitz, especial) ganham uma etapa extra pra escolher a variação, que passa a aparecer no nome exportado (ex.: “Arenito glitz médio”)",
+      "Cadastro de cliente: CPF/CNPJ deixou de ser obrigatório — dá pra cadastrar um cliente ainda em fase de orçamento, com o documento capturado depois; finalizar/exportar o pedido só é bloqueado se o campo foi preenchido com algo inválido, nunca por estar vazio",
+    ],
+  },
   {
     versao: "1.5",
     data: "2026-08-04",

@@ -77,10 +77,13 @@ export function montarDadosExportacao(
       item: item.item,
       qtd: item.qtd,
       embalagem: item.embalagem ?? "",
-      // Nome do produto sem os detalhes/variante — "descricaoProduto" no item guarda
+      // Nome do produto sem os detalhes (cor) — "descricaoProduto" no item guarda
       // o texto combinado "Nome (Detalhes)" usado só para reabrir o fluxo guiado na
-      // edição; os arquivos exportados mostram apenas o nome.
-      descricaoProduto: item.nomeProduto ?? item.descricaoProduto,
+      // edição; os arquivos exportados mostram o nome + a variação de tamanho/tipo
+      // (quando houver, ex.: "Arenito glitz médio") — detalhes continua fora.
+      descricaoProduto: [item.nomeProduto ?? item.descricaoProduto, item.variacaoProduto]
+        .filter(Boolean)
+        .join(" "),
       cor: item.cor ?? "",
       padraoComplemento: item.padraoComplemento ?? "",
       descricao: item.descricao ?? "",

@@ -7,23 +7,32 @@ import { montarDadosExportacao } from "./dadosExportacao";
 import type { Cliente, Pedido } from "../../domain/types";
 
 /**
- * Testa o caminho real (preencherModelo) contra o arquivo verdadeiro do molde,
- * enviado pelo usuário em public/templates/modelo_pedido.xlsx. `fetch` não serve
- * arquivos locais fora de um servidor, então o mock abaixo lê o arquivo do disco
- * e devolve uma Response equivalente — o mesmo que o navegador faria ao servir o
- * arquivo do precache do service worker.
+ * Testa o caminho real (preencherModelo) contra os dois arquivos verdadeiros do
+ * molde, enviados pelo usuário em public/templates/modelo_pedido_30.xlsx (até 30
+ * itens) e modelo_pedido_70.xlsx (31 a 70 itens). `fetch` não serve arquivos
+ * locais fora de um servidor, então o mock abaixo lê o arquivo certo do disco
+ * (pelo caminho pedido) e devolve uma Response equivalente — o mesmo que o
+ * navegador faria ao servir o arquivo do precache do service worker.
  */
 
-const CAMINHO_MODELO = path.resolve(
+const CAMINHO_MODELO_30 = path.resolve(
   __dirname,
-  "../../../public/templates/modelo_pedido.xlsx",
+  "../../../public/templates/modelo_pedido_30.xlsx",
+);
+const CAMINHO_MODELO_70 = path.resolve(
+  __dirname,
+  "../../../public/templates/modelo_pedido_70.xlsx",
 );
 
 beforeEach(() => {
-  const buffer = readFileSync(CAMINHO_MODELO);
+  const buffer30 = readFileSync(CAMINHO_MODELO_30);
+  const buffer70 = readFileSync(CAMINHO_MODELO_70);
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => new Response(buffer, { status: 200 })),
+    vi.fn(async (url: string) => {
+      const buffer = url.includes("_70") ? buffer70 : buffer30;
+      return new Response(buffer, { status: 200 });
+    }),
   );
 });
 
@@ -87,6 +96,7 @@ const pedido: Pedido = {
   atualizadoEm: "2026-07-30T10:00:00.000Z",
 };
 
+/** Pedido de 2 itens (o padrão acima) sempre cai no molde de 30. */
 async function abrirGerado() {
   const dados = montarDadosExportacao(pedido, cliente);
   const { blob } = await gerarExcel(dados);
@@ -95,7 +105,20 @@ async function abrirGerado() {
   return { workbook, planilha: workbook.getWorksheet("Pedido")!, dados };
 }
 
-describe("gerarExcel — modelo real (aba Pedido)", () => {
+function pedidoComItens(quantidade: number): Pedido {
+  return {
+    ...pedido,
+    itens: Array.from({ length: quantidade }, (_, i) => ({
+      item: i + 1,
+      qtd: 1,
+      embalagem: "Galão (3,6 L)",
+      descricaoProduto: `Produto ${i + 1}`,
+      valorUnit: 10,
+    })),
+  };
+}
+
+describe("gerarExcel — modelo real (aba Pedido, molde de 30 itens)", () => {
   it("modeloDisponivel() acha o arquivo enviado pelo usuário", async () => {
     expect(await modeloDisponivel()).toBe(true);
   });
@@ -165,32 +188,32 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
 
   it("preenche o rodapé de 4 colunas, com o total já descontado", async () => {
     const { planilha, dados } = await abrirGerado();
-    // Linha 63 é só o rótulo (nunca sobrescrito); o valor de verdade vai na
-    // linha de baixo (64), mesma linha de Representante e Valor do pedido.
-    expect(planilha.getCell("A63").value).toBe("FORMA DE SOLICITAÇÃO");
-    expect(planilha.getCell("D63").value).toBe("DATA");
-    expect(planilha.getCell("A64").value).toBe("WhatsApp");
-    expect(planilha.getCell("D64").value).toBe("30/07/2026");
-    expect(planilha.getCell("E64").value).toContain("João Vendedor");
-    expect(planilha.getCell("E65").value).toBe("joao@exemplo.com");
+    // Linha 43 é só o rótulo (nunca sobrescrito); o valor de verdade vai na
+    // linha de baixo (44), mesma linha de Representante e Valor do pedido.
+    expect(planilha.getCell("A43").value).toBe("FORMA DE SOLICITAÇÃO");
+    expect(planilha.getCell("D43").value).toBe("DATA");
+    expect(planilha.getCell("A44").value).toBe("WhatsApp");
+    expect(planilha.getCell("D44").value).toBe("30/07/2026");
+    expect(planilha.getCell("E44").value).toContain("João Vendedor");
+    expect(planilha.getCell("E45").value).toBe("joao@exemplo.com");
 
     // A fórmula original (SUM dos itens, incluindo as próprias linhas de
     // Subtotal/Desconto) não aplica desconto de verdade — sobrescrita com o
     // total já descontado calculado pelo app.
-    expect(planilha.getCell("G64").value).toBe(dados.totais.total);
+    expect(planilha.getCell("G44").value).toBe(dados.totais.total);
     expect(dados.totais.total).toBeCloseTo(2012.45);
   });
 
-  it("acha a linha Subtotal automaticamente (o usuário já mudou o tamanho da tabela de itens 3x)", async () => {
+  it("acha a linha Subtotal automaticamente (o usuário já mudou o tamanho da tabela de itens várias vezes)", async () => {
     const { planilha, dados } = await abrirGerado();
-    // Bloco de itens hoje vai de 11 a 60; o molde traz Subtotal (61) e Desconto
-    // (62) nativamente, antes do rodapé (63-65). Não é um número fixo no código —
-    // é achado escaneando a coluna A por "Subtotal", então continua funcionando
-    // se a tabela de itens mudar de tamanho de novo.
-    expect(planilha.getCell("A61").value).toBe("Subtotal");
-    expect(planilha.getCell("H61").value).toBeCloseTo(dados.totais.subtotal);
-    expect(planilha.getCell("A62").value).toBe(dados.descontoRotulo);
-    expect(planilha.getCell("H62").value).toBeCloseTo(-dados.totais.desconto);
+    // Bloco de itens do molde de 30 vai de 11 a 40; o molde traz Subtotal (41) e
+    // Desconto (42) nativamente, antes do rodapé (43-45). Não é um número fixo no
+    // código — é achado escaneando a coluna A por "Subtotal", então continua
+    // funcionando se a tabela de itens mudar de tamanho de novo.
+    expect(planilha.getCell("A41").value).toBe("Subtotal");
+    expect(planilha.getCell("H41").value).toBeCloseTo(dados.totais.subtotal);
+    expect(planilha.getCell("A42").value).toBe(dados.descontoRotulo);
+    expect(planilha.getCell("H42").value).toBeCloseTo(-dados.totais.desconto);
   });
 
   it("mostra Subtotal e Desconto (R$ 0,00) mesmo sem desconto aplicado", async () => {
@@ -201,9 +224,9 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     await workbook.xlsx.load(await blob.arrayBuffer());
     const planilha = workbook.getWorksheet("Pedido")!;
 
-    expect(planilha.getCell("A61").value).toBe("Subtotal");
-    expect(planilha.getCell("A62").value).toBe("Desconto");
-    expect(planilha.getCell("H62").value).toBe(0);
+    expect(planilha.getCell("A41").value).toBe("Subtotal");
+    expect(planilha.getCell("A42").value).toBe("Desconto");
+    expect(planilha.getCell("H42").value).toBe(0);
   });
 
   it("mostra o motivo do desconto como nota na célula do valor, sem usar uma 3ª linha", async () => {
@@ -214,33 +237,56 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     await workbook.xlsx.load(await blob.arrayBuffer());
     const planilha = workbook.getWorksheet("Pedido")!;
 
-    expect(planilha.getCell("A61").value).toBe("Subtotal");
-    expect(planilha.getCell("A62").value).toBe(dados.descontoRotulo);
-    expect(planilha.getCell("H62").note).toContain("Autorizado pelo gerente");
-    // O rodapé continua logo em seguida — rótulos na linha 63, valores na 64,
+    expect(planilha.getCell("A41").value).toBe("Subtotal");
+    expect(planilha.getCell("A42").value).toBe(dados.descontoRotulo);
+    expect(planilha.getCell("H42").note).toContain("Autorizado pelo gerente");
+    // O rodapé continua logo em seguida — rótulos na linha 43, valores na 44,
     // nenhuma linha extra inserida.
-    expect(planilha.getCell("A63").value).toBe("FORMA DE SOLICITAÇÃO");
-    expect(planilha.getCell("A64").value).toBe("WhatsApp");
-    expect(planilha.getCell("D64").value).toBe(dados.dataPedido);
+    expect(planilha.getCell("A43").value).toBe("FORMA DE SOLICITAÇÃO");
+    expect(planilha.getCell("A44").value).toBe("WhatsApp");
+    expect(planilha.getCell("D44").value).toBe(dados.dataPedido);
+  });
+});
+
+describe("gerarExcel — escolha entre os moldes de 30 e 70 itens", () => {
+  it("com exatamente 30 itens, ainda usa o molde de 30 (limite inclusive)", async () => {
+    const dados = montarDadosExportacao(pedidoComItens(30), cliente);
+    const { usouModelo, motivoFallback } = await gerarExcel(dados);
+    expect(usouModelo).toBe(true);
+    expect(motivoFallback).toBeUndefined();
+
+    // fetch mockado: se pediu o arquivo "_70", teria vindo do outro buffer —
+    // confirmamos indiretamente checando a capacidade real (30 no molde de 30).
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("modelo_pedido_30.xlsx"), expect.anything());
   });
 
-  it("com mais produtos do que a capacidade do molde, usa o gerador alternativo em vez de arriscar duplicar linha no molde real", async () => {
+  it("com 31 itens, passa a usar o molde de 70", async () => {
+    const dados = montarDadosExportacao(pedidoComItens(31), cliente);
+    const { blob, usouModelo, motivoFallback } = await gerarExcel(dados);
+    expect(usouModelo).toBe(true);
+    expect(motivoFallback).toBeUndefined();
+
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("modelo_pedido_70.xlsx"), expect.anything());
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await blob.arrayBuffer());
+    const planilha = workbook.getWorksheet("Pedido")!;
+    // Subtotal do molde de 70 fica na linha 81 (itens de 11 a 80).
+    expect(planilha.getCell("A81").value).toBe("Subtotal");
+    expect(planilha.getCell("D41").value).toBe("Produto 31");
+  });
+
+  it("com mais itens do que a capacidade do maior molde (70), usa o gerador alternativo em vez de arriscar duplicar linha", async () => {
     // Duplicar linha esbarra numa limitação do ExcelJS: não realoca as mesclagens
     // já existentes abaixo do ponto de inserção (rodapé, Subtotal/Desconto e o
     // bloco de revisão do molde ficam "presos" no lugar antigo) — e isso nem
     // sempre lança exceção, às vezes só redireciona a escrita em silêncio. Por
     // isso gerarExcel evita esse caminho por completo quando excede a capacidade
-    // detectada (hoje 50 produtos: linhas 11 a 60), em vez de tentar e torcer
-    // para que dê uma exceção limpa.
-    const muitosItens = Array.from({ length: 55 }, (_, i) => ({
-      item: i + 1,
-      qtd: 1,
-      embalagem: "Galão (3,6 L)",
-      descricaoProduto: `Produto ${i + 1}`,
-      valorUnit: 10,
-    }));
-    const pedidoGrande: Pedido = { ...pedido, itens: muitosItens };
-    const dados = montarDadosExportacao(pedidoGrande, cliente);
+    // detectada (hoje 70 produtos: linhas 11 a 80 no molde de 70), em vez de
+    // tentar e torcer para que dê uma exceção limpa.
+    const dados = montarDadosExportacao(pedidoComItens(75), cliente);
 
     const { blob, usouModelo, motivoFallback } = await gerarExcel(dados);
     expect(usouModelo).toBe(false);
@@ -252,5 +298,15 @@ describe("gerarExcel — modelo real (aba Pedido)", () => {
     const planilha = workbook.worksheets[0];
     expect(planilha.name).toBe("Pedido"); // construirDoZero também nomeia a aba "Pedido"
     expect(planilha.getCell("D10").value).toBe("Produto 1");
+  });
+
+  it("modeloDisponivel() reflete o molde que seria usado para a quantidade de itens informada", async () => {
+    expect(await modeloDisponivel(10)).toBe(true);
+    expect(await modeloDisponivel(50)).toBe(true);
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("modelo_pedido_70.xlsx"),
+      expect.anything(),
+    );
   });
 });

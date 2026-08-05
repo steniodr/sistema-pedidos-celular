@@ -96,7 +96,7 @@ export interface ImportacaoClientesInfo {
   totalIgnorados: number;
 }
 
-export type EntradaProduto = Pick<Produto, "nome" | "detalhes" | "embalagem" | "valorUnit">;
+export type EntradaProduto = Pick<Produto, "nome" | "detalhes" | "variacao" | "embalagem" | "valorUnit">;
 
 export type EntradaProdutoUnico = EntradaProduto & { id?: string };
 

@@ -223,6 +223,28 @@ describe("fluxo do pedido", () => {
     expect(botao.hasAttribute("disabled")).toBe(true);
   });
 
+  it("permite exportar mesmo sem CPF/CNPJ do cliente (documento é opcional, ex.: orçamento)", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Sem Documento Ainda",
+      cpfCnpj: "",
+    });
+    const pedido = await dexieRepository.criarPedido({
+      clienteId: cliente.id,
+      marca: "MERKO",
+    });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
+    expect(screen.queryByText(/CPF\/CNPJ do cliente é inválido/)).toBeNull();
+    expect(botao.hasAttribute("disabled")).toBe(false);
+  });
+
   it("exporta um pedido válido e marca como enviado", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Válido",
