@@ -5,13 +5,20 @@ import { Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { Select } from "../../components/ui/Field";
 import { formatarMoeda } from "../../domain/calculos";
 import {
+  categoriasMaisVendidas,
+  clientesMaisVendidos,
   filtrarPedidos,
+  granularidadePara,
   intervaloPeriodo,
   produtosMaisVendidos,
   resumoVendas,
-  type OrdemValor,
+  serieTemporalItens,
+  serieTemporalPedidos,
+  SEM_CATEGORIA,
   type Periodo,
 } from "../../domain/relatorios";
+import { GraficoRosca } from "./GraficoRosca";
+import { GraficoLinha } from "./GraficoLinha";
 import css from "./relatorios.module.css";
 
 const PERIODOS = ["semana", "mes", "tudo"] as const satisfies readonly Periodo[];
@@ -23,11 +30,11 @@ const ROTULOS_PERIODO: Record<Periodo, string> = {
 const TODAS_MARCAS = "Todas";
 const TODOS_CLIENTES = "";
 
-const ORDENS_VALOR = ["Maior valor", "Menor valor"] as const;
-type RotuloOrdem = (typeof ORDENS_VALOR)[number];
-const ORDEM_POR_ROTULO: Record<RotuloOrdem, OrdemValor> = {
-  "Maior valor": "desc",
-  "Menor valor": "asc",
+const VISOES = ["produto", "cliente"] as const;
+type Visao = (typeof VISOES)[number];
+const ROTULOS_VISAO: Record<Visao, string> = {
+  produto: "Por produto",
+  cliente: "Por cliente",
 };
 
 export function RelatoriosPage() {
@@ -35,22 +42,43 @@ export function RelatoriosPage() {
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [marcaFiltro, setMarcaFiltro] = useState(TODAS_MARCAS);
   const [clienteFiltro, setClienteFiltro] = useState(TODOS_CLIENTES);
-  const [rotuloOrdem, setRotuloOrdem] = useState<RotuloOrdem>("Maior valor");
+  const [visao, setVisao] = useState<Visao>("produto");
+
+  // Drill-down: no modo produto, categoria → produto (dois níveis); no modo
+  // cliente, só cliente (já é o nível-folha). Persistem entre trocas de
+  // período/marca/cliente-filtro — só reseta ao trocar de visão.
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
+  const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
+  const [clienteDetalhe, setClienteDetalhe] = useState<{ id: string; nome: string } | null>(null);
+
+  function trocarVisao(nova: Visao) {
+    setVisao(nova);
+    setCategoriaSelecionada(null);
+    setProdutoSelecionado(null);
+    setClienteDetalhe(null);
+  }
 
   const { dados: contexto } = useDados(async () => {
-    const [enviadosBrutos, clientes] = await Promise.all([
+    const [enviadosBrutos, clientes, produtos] = await Promise.all([
       repo.listarPedidos({ status: "enviado" }),
       repo.listarClientes(),
+      // Catálogo inteiro (não só os primeiros 50) — precisa de todo mundo pro
+      // mapa nome→categoria usado no agrupamento por categoria. Limite bem
+      // acima de qualquer base real, mas dentro do que o IndexedDB aceita em
+      // cursor (Number.MAX_SAFE_INTEGER estoura o unsigned de 32 bits e o
+      // Dexie rejeita a consulta inteira).
+      repo.listarProdutos(undefined, 1_000_000),
     ]);
     // Pedidos gerados em Configurações → "Criar pedidos de teste" não são vendas
     // reais — nunca entram nos números de Relatórios.
     const enviados = enviadosBrutos.filter((p) => !p.teste);
     const nomePorClienteId = new Map(clientes.map((c) => [c.id, c.nome]));
+    const categoriaPorNome = new Map(produtos.map((p) => [p.nome, p.categoria]));
     const marcas = [...new Set(enviados.map((p) => p.marca).filter(Boolean))];
     const clientesComPedido = [...new Set(enviados.map((p) => p.clienteId))]
       .map((id) => ({ id, nome: nomePorClienteId.get(id) ?? "Cliente removido" }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-    return { enviados, marcas, clientesComPedido };
+    return { enviados, marcas, clientesComPedido, nomePorClienteId, categoriaPorNome };
   }, [repo]);
 
   const { inicio, fim } = intervaloPeriodo(periodo);
@@ -66,18 +94,73 @@ export function RelatoriosPage() {
   }, [contexto, inicio, fim, marcaFiltro, clienteFiltro]);
 
   const resumo = resumoVendas(filtrados);
-  const maisVendidos = produtosMaisVendidos(filtrados, 10, ORDEM_POR_ROTULO[rotuloOrdem]);
-  const maiorValor = Math.max(0, ...maisVendidos.map((p) => p.valorTotal));
+  const granularidade = granularidadePara(periodo);
+
+  // Visão "por produto": nível 1 = categorias; nível 2 (categoria escolhida) = produtos dela.
+  const produtosCompletos = useMemo(() => produtosMaisVendidos(filtrados, Infinity), [filtrados]);
+  const categorias = useMemo(
+    () => categoriasMaisVendidas(produtosCompletos, contexto?.categoriaPorNome ?? new Map()),
+    [produtosCompletos, contexto],
+  );
+  const produtosDaCategoria = useMemo(() => {
+    if (!categoriaSelecionada) return [];
+    const categoriaPorNome = contexto?.categoriaPorNome ?? new Map();
+    return produtosCompletos.filter(
+      (p) => (categoriaPorNome.get(p.nome) || SEM_CATEGORIA) === categoriaSelecionada,
+    );
+  }, [produtosCompletos, contexto, categoriaSelecionada]);
+
+  // Visão "por cliente": nível único.
+  const clientesRanking = useMemo(
+    () => (contexto ? clientesMaisVendidos(filtrados, contexto.nomePorClienteId, Infinity) : []),
+    [filtrados, contexto],
+  );
+
+  const emCategoria = visao === "produto" && categoriaSelecionada !== null;
+  const fatiasRosca =
+    visao === "cliente"
+      ? clientesRanking.map((c) => ({ rotulo: c.nome, valor: c.valorTotal }))
+      : emCategoria
+        ? produtosDaCategoria.map((p) => ({ rotulo: p.nome, valor: p.valorTotal }))
+        : categorias.map((c) => ({ rotulo: c.categoria, valor: c.valorTotal }));
+
+  const rotuloCentroRosca =
+    visao === "cliente" ? "Clientes" : (categoriaSelecionada ?? "Categorias");
+  const itemSelecionado =
+    visao === "cliente" ? clienteDetalhe?.nome : (produtoSelecionado ?? categoriaSelecionada);
+
+  function selecionarItem(rotulo: string) {
+    if (visao === "cliente") {
+      const cliente = clientesRanking.find((c) => c.nome === rotulo);
+      if (cliente) setClienteDetalhe({ id: cliente.clienteId, nome: cliente.nome });
+      return;
+    }
+    if (categoriaSelecionada) {
+      setProdutoSelecionado(rotulo);
+    } else {
+      setCategoriaSelecionada(rotulo);
+      setProdutoSelecionado(null);
+    }
+  }
+
+  const serieTempo = useMemo(() => {
+    if (visao === "cliente" && clienteDetalhe) {
+      const pedidosDoCliente = filtrarPedidos(filtrados, { clienteId: clienteDetalhe.id });
+      return serieTemporalPedidos(pedidosDoCliente, granularidade);
+    }
+    if (visao === "produto" && categoriaSelecionada) {
+      const nomes = new Set(
+        produtoSelecionado ? [produtoSelecionado] : produtosDaCategoria.map((p) => p.nome),
+      );
+      return serieTemporalItens(filtrados, nomes, granularidade);
+    }
+    return null;
+  }, [visao, clienteDetalhe, categoriaSelecionada, produtoSelecionado, produtosDaCategoria, filtrados, granularidade]);
 
   const opcoesMarca = [TODAS_MARCAS, ...(contexto?.marcas ?? [])];
 
   return (
     <Tela titulo="Relatórios" voltar="/">
-      <p className={css.aviso}>
-        Mostra só os pedidos enviados neste aparelho — ainda não há
-        sincronização entre vendedores.
-      </p>
-
       <Chips
         opcoes={PERIODOS}
         valor={periodo}
@@ -125,41 +208,63 @@ export function RelatoriosPage() {
             </div>
           </Cartao>
 
-          <div className="linha linha--entre">
-            <h2 className="secao-titulo">Produtos mais vendidos</h2>
-            <div className={css.ordemValor} role="group" aria-label="Ordenar por valor">
-              {ORDENS_VALOR.map((rotulo) => (
-                <button
-                  key={rotulo}
-                  type="button"
-                  className={`${css.ordemValorBotao} ${
-                    rotulo === rotuloOrdem ? css["ordemValorBotao--ativo"] : ""
-                  }`}
-                  aria-label={rotulo}
-                  aria-pressed={rotulo === rotuloOrdem}
-                  onClick={() => setRotuloOrdem(rotulo)}
-                >
-                  {rotulo === "Maior valor" ? "$↑" : "$↓"}
-                </button>
-              ))}
-            </div>
+          <div className={css.visaoToggle}>
+            <Chips opcoes={VISOES} valor={visao} onChange={trocarVisao} rotulos={ROTULOS_VISAO} />
           </div>
+
+          {(categoriaSelecionada || clienteDetalhe) && (
+            <div className="linha" style={{ gap: 8, flexWrap: "wrap" }}>
+              {visao === "produto" && categoriaSelecionada && (
+                <button
+                  type="button"
+                  className={css.selecaoChip}
+                  onClick={() => {
+                    setCategoriaSelecionada(null);
+                    setProdutoSelecionado(null);
+                  }}
+                >
+                  Categoria: {categoriaSelecionada} ✕
+                </button>
+              )}
+              {visao === "produto" && produtoSelecionado && (
+                <button
+                  type="button"
+                  className={css.selecaoChip}
+                  onClick={() => setProdutoSelecionado(null)}
+                >
+                  Produto: {produtoSelecionado} ✕
+                </button>
+              )}
+              {visao === "cliente" && clienteDetalhe && (
+                <button
+                  type="button"
+                  className={css.selecaoChip}
+                  onClick={() => setClienteDetalhe(null)}
+                >
+                  Cliente: {clienteDetalhe.nome} ✕
+                </button>
+              )}
+            </div>
+          )}
+
+          <h2 className="secao-titulo">Visão geral</h2>
           <Cartao>
-            {maisVendidos.map((p) => (
-              <div key={p.nome} className={css.barraLinha}>
-                <div className={css.barraRotulo}>
-                  <span>{p.nome}</span>
-                  <span className="texto-suave">{formatarMoeda(p.valorTotal)}</span>
-                </div>
-                <div className={css.barraTrilha}>
-                  <div
-                    className={css.barraPreenchida}
-                    style={{ width: `${maiorValor > 0 ? (p.valorTotal / maiorValor) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+            <GraficoRosca
+              fatias={fatiasRosca}
+              rotuloCentro={rotuloCentroRosca}
+              selecionado={itemSelecionado ?? null}
+              onSelecionar={selecionarItem}
+            />
           </Cartao>
+
+          {serieTempo && (
+            <>
+              <h2 className="secao-titulo">Evolução no período</h2>
+              <Cartao>
+                <GraficoLinha pontos={serieTempo} />
+              </Cartao>
+            </>
+          )}
         </>
       )}
     </Tela>

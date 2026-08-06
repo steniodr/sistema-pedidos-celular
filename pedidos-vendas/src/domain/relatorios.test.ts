@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  categoriasMaisVendidas,
+  clientesMaisVendidos,
   filtrarPedidos,
+  granularidadePara,
   intervaloPeriodo,
   produtosMaisVendidos,
   resumoVendas,
+  serieTemporalItens,
+  serieTemporalPedidos,
+  SEM_CATEGORIA,
 } from "./relatorios";
 import type { ItemPedido, Pedido } from "./types";
 
@@ -149,5 +155,121 @@ describe("produtosMaisVendidos", () => {
       }),
     ];
     expect(produtosMaisVendidos(pedidos, 2)).toHaveLength(2);
+  });
+});
+
+describe("clientesMaisVendidos", () => {
+  const nomePorClienteId = new Map([
+    ["c1", "Tintas do Vale"],
+    ["c2", "Casa da Tinta"],
+  ]);
+
+  it("agrega valor e conta pedidos por cliente, ordenado por valor", () => {
+    const pedidos = [
+      pedido({ clienteId: "c1", itens: [item({ qtd: 1, valorUnit: 100 })] }),
+      pedido({ clienteId: "c1", itens: [item({ qtd: 1, valorUnit: 50 })] }),
+      pedido({ clienteId: "c2", itens: [item({ qtd: 1, valorUnit: 500 })] }),
+    ];
+    expect(clientesMaisVendidos(pedidos, nomePorClienteId)).toEqual([
+      { clienteId: "c2", nome: "Casa da Tinta", quantidadePedidos: 1, valorTotal: 500 },
+      { clienteId: "c1", nome: "Tintas do Vale", quantidadePedidos: 2, valorTotal: 150 },
+    ]);
+  });
+
+  it("usa 'Cliente removido' quando o id não está no mapa (cliente excluído)", () => {
+    const pedidos = [pedido({ clienteId: "fantasma", itens: [item({ valorUnit: 10 })] })];
+    expect(clientesMaisVendidos(pedidos, nomePorClienteId)[0].nome).toBe("Cliente removido");
+  });
+
+  it("ordena por menor valor quando pedido explicitamente", () => {
+    const pedidos = [
+      pedido({ clienteId: "c1", itens: [item({ valorUnit: 100 })] }),
+      pedido({ clienteId: "c2", itens: [item({ valorUnit: 500 })] }),
+    ];
+    expect(clientesMaisVendidos(pedidos, nomePorClienteId, 10, "asc").map((c) => c.clienteId)).toEqual([
+      "c1",
+      "c2",
+    ]);
+  });
+});
+
+describe("categoriasMaisVendidas", () => {
+  it("reagrupa produtos já somados por categoria, ordenado por valor", () => {
+    const produtos = [
+      { nome: "Esmalte brilhante", quantidade: 2, valorTotal: 200 },
+      { nome: "Esmalte fosco", quantidade: 1, valorTotal: 100 },
+      { nome: "Arenito", quantidade: 3, valorTotal: 900 },
+    ];
+    const categoriaPorNome = new Map([
+      ["Esmalte brilhante", "Esmaltes"],
+      ["Esmalte fosco", "Esmaltes"],
+      ["Arenito", "Texturas"],
+    ]);
+    expect(categoriasMaisVendidas(produtos, categoriaPorNome)).toEqual([
+      { categoria: "Texturas", quantidade: 3, valorTotal: 900 },
+      { categoria: "Esmaltes", quantidade: 3, valorTotal: 300 },
+    ]);
+  });
+
+  it("agrupa em 'Sem categoria' produtos que não casam com o catálogo atual (renomeado/removido)", () => {
+    const produtos = [{ nome: "Produto descontinuado", quantidade: 1, valorTotal: 50 }];
+    expect(categoriasMaisVendidas(produtos, new Map())).toEqual([
+      { categoria: SEM_CATEGORIA, quantidade: 1, valorTotal: 50 },
+    ]);
+  });
+});
+
+describe("granularidadePara", () => {
+  it("'tudo' usa granularidade mensal; semana/mês usam diária", () => {
+    expect(granularidadePara("tudo")).toBe("mes");
+    expect(granularidadePara("semana")).toBe("dia");
+    expect(granularidadePara("mes")).toBe("dia");
+  });
+});
+
+describe("serieTemporalPedidos", () => {
+  it("soma o total de cada pedido por dia, em ordem cronológica", () => {
+    const pedidos = [
+      pedido({ dataPedido: "2026-08-02", itens: [item({ valorUnit: 50 })] }),
+      pedido({ dataPedido: "2026-08-01", itens: [item({ valorUnit: 100 })] }),
+      pedido({ dataPedido: "2026-08-01", itens: [item({ valorUnit: 20 })] }),
+    ];
+    expect(serieTemporalPedidos(pedidos, "dia")).toEqual([
+      { chave: "2026-08-01", rotulo: "01/08", valorTotal: 120 },
+      { chave: "2026-08-02", rotulo: "02/08", valorTotal: 50 },
+    ]);
+  });
+
+  it("agrupa por mês com rótulo abreviado", () => {
+    const pedidos = [
+      pedido({ dataPedido: "2026-08-15", itens: [item({ valorUnit: 100 })] }),
+      pedido({ dataPedido: "2026-09-01", itens: [item({ valorUnit: 200 })] }),
+    ];
+    expect(serieTemporalPedidos(pedidos, "mes")).toEqual([
+      { chave: "2026-08", rotulo: "ago/26", valorTotal: 100 },
+      { chave: "2026-09", rotulo: "set/26", valorTotal: 200 },
+    ]);
+  });
+});
+
+describe("serieTemporalItens", () => {
+  it("soma só os itens cujo nome está no conjunto, ignorando os demais itens do mesmo pedido", () => {
+    const pedidos = [
+      pedido({
+        dataPedido: "2026-08-01",
+        itens: [
+          item({ nomeProduto: "Arenito", valorUnit: 100 }),
+          item({ nomeProduto: "Esmalte", valorUnit: 500 }), // fora do conjunto — ignorado
+        ],
+      }),
+      pedido({
+        dataPedido: "2026-08-01",
+        itens: [item({ nomeProduto: "Arenito glitz", valorUnit: 50 })],
+      }),
+    ];
+    const nomes = new Set(["Arenito", "Arenito glitz"]);
+    expect(serieTemporalItens(pedidos, nomes, "dia")).toEqual([
+      { chave: "2026-08-01", rotulo: "01/08", valorTotal: 150 },
+    ]);
   });
 });

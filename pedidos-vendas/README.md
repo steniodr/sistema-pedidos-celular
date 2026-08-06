@@ -33,7 +33,9 @@ src/
     produtos/    base de preços: listagem, edição/exclusão manual, importação
     pedidos/     novo pedido, itens, resumo, finalização e histórico
     checkin/     check-in de visita ao cliente (horário) e exportação por data
-    relatorios/  vendas por período (semana/mês/tudo), cliente e marca
+    relatorios/  vendas por período (semana/mês/tudo), cliente e marca — visão
+                 por produto (categoria → produtos) ou por cliente, com
+                 gráfico de rosca e linha do tempo no detalhe
     export/      geração do .xlsx (molde real + gerador alternativo) e do .pdf
     config/      dados do representante, atalho de importação
 ```
@@ -61,14 +63,19 @@ Detalhes) e uma coluna por embalagem (Galão, Lata, Tambor…), com o preço na 
 automaticamente e explode cada linha em uma combinação produto+embalagem por
 coluna preenchida. Também aceita, como alternativa, uma lista simples de 3 colunas
 (descrição, embalagem, valor) — o detector escolhe o formato pelo número de
-colunas do cabeçalho. Produto tem `nome`, `detalhes` (variante/observação, ex.:
-diferença de preço por cor) e `variacao` (tamanho/tipo que **não** muda o
-preço, ex.: "#08", "médio") separados no banco — `detalhes` nunca aparece na
-exportação, `variacao` aparece somada ao nome quando o item tiver uma (ver
-"Exportação em Excel" abaixo). Ao montar o pedido, se um nome tiver mais de
-uma variante (`detalhes` diferente) e/ou mais de uma variação, o vendedor
-escolhe qual antes de ver embalagem/preço — cada etapa só aparece quando o
-produto realmente tem mais de uma opção.
+colunas do cabeçalho. Produto tem `nome`, `categoria` (a própria coluna
+"Categoria" da planilha, capturada de verdade — antes só era usada pra
+detectar as colunas de preço, agora também é gravada), `detalhes`
+(variante/observação, ex.: diferença de preço por cor) e `variacao`
+(tamanho/tipo que **não** muda o preço, ex.: "#08", "médio") separados no
+banco — `detalhes` nunca aparece na exportação, `variacao` aparece somada ao
+nome quando o item tiver uma (ver "Exportação em Excel" abaixo), e
+`categoria` alimenta o agrupamento em Relatórios (produto sem categoria —
+base ainda não reimportada com a coluna — entra como "Sem categoria"). Ao
+montar o pedido, se um nome tiver mais de uma variante (`detalhes` diferente)
+e/ou mais de uma variação, o vendedor escolhe qual antes de ver
+embalagem/preço — cada etapa só aparece quando o produto realmente tem mais
+de uma opção.
 
 ### Importação da base de clientes
 
@@ -175,11 +182,12 @@ avisa quantos pedidos ficam sem o nome do cliente antes de confirmar, e oferece
 (criar/editar/excluir produto na mão, com "Desfazer", além da importação),
 ordenação (Nome/Valor), indicador de base desatualizada (verde ≤30 dias, amarelo
 30–90, vermelho >90 — acima de 90 dias exige uma confirmação extra ao finalizar
-o pedido, mas nunca bloqueia). Campo Variação (tamanho/tipo, ex.: "#08",
-"médio") opcional e independente de Detalhes — usado hoje pelas famílias
-Textura rústica/arranhado e Arenito (glitz, especial); quando um produto tem
-mais de uma variação, o vendedor escolhe qual ao montar o item, e o valor
-escolhido some ao nome no Excel/PDF exportado.
+o pedido, mas nunca bloqueia). Campo Categoria (capturado da planilha,
+opcional) usado pelo agrupamento de Relatórios. Campo Variação (tamanho/tipo,
+ex.: "#08", "médio") opcional e independente de Detalhes — usado hoje pelas
+famílias Textura rústica/arranhado e Arenito (glitz, especial); quando um
+produto tem mais de uma variação, o vendedor escolhe qual ao montar o item, e
+o valor escolhido some ao nome no Excel/PDF exportado.
 
 **Pedido** — marca em texto livre e data do pedido (editável em Finalizar; o
 horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
@@ -226,11 +234,19 @@ Padrão/Complemento, igual ao Excel).
 
 **Relatórios** — tela de vendas com filtro por período (semana atual, mês atual
 ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
-ticket médio; lista de produtos mais vendidos com toggle Maior/Menor valor
-(barras simples, sem lib de gráfico — ver `src/domain/relatorios.ts`). Só
-conta pedidos com status "Enviado" (rascunho não é venda fechada), nunca
-conta os pedidos de teste (ver "Backup" abaixo) e só reflete os pedidos
-deste aparelho, já que a sincronização entre vendedores ainda não existe.
+ticket médio; alterna entre visão **"Por produto"** (agrupado por Categoria,
+com "Sem categoria" pra quem ainda não tem) e **"Por cliente"**. Gráfico de
+rosca (donut, SVG desenhado à mão — sem lib de gráfico) mostra a distribuição
+geral do nível atual, com legenda clicável (nome, valor, porcentagem);
+clicar numa categoria desce pra ver os produtos dela (drill-down de 2
+níveis), clicar num cliente ou num produto abre um gráfico de linha com a
+evolução das vendas daquele item ao longo do período (granularidade diária
+pra semana/mês, mensal pra "tudo" — ver `granularidadePara` em
+`src/domain/relatorios.ts`). Paleta de cores categórica validada
+(colorblind-safe) contra a superfície real do app. Só conta pedidos com
+status "Enviado" (rascunho não é venda fechada), nunca conta os pedidos de
+teste (ver "Backup" abaixo) e só reflete os pedidos deste aparelho, já que a
+sincronização entre vendedores ainda não existe.
 
 **Backup** — Configurações tem botões para baixar toda a base local (clientes,
 produtos, pedidos, representante) em um `.json`, e restaurar a partir de um
@@ -242,7 +258,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.7`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.8`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -250,7 +266,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-169 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
+178 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
 dos moldes Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

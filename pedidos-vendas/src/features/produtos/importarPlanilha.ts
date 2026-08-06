@@ -17,7 +17,8 @@ import type { EntradaProduto } from "../../data/repository";
  * significa que aquela combinação não existe. O importador explode cada linha em
  * uma entrada por embalagem preenchida. A coluna "Variação" é opcional e
  * independente de "Detalhes": tamanho/tipo que não muda o preço (ex.: "#08",
- * "médio") — some ao nome do produto só na hora de exportar o pedido.
+ * "médio") — some ao nome do produto só na hora de exportar o pedido. A coluna
+ * "Categoria" é gravada no produto (usada pra agrupar vendas em Relatórios).
  *
  * Também aceita o formato simples de lista (uma linha por produto+embalagem, com
  * colunas fixas de descrição/embalagem/valor), caso um arquivo diferente apareça —
@@ -229,6 +230,7 @@ function converterMatriz(planilha: PlanilhaLida, colunas: ColunasMatriz): Result
       continue;
     }
 
+    const categoria = colunas.categoria !== null ? textoDaCelula(linha[colunas.categoria]) : "";
     const detalhes = colunas.detalhes !== null ? textoDaCelula(linha[colunas.detalhes]) : "";
     const variacao = colunas.variacao !== null ? textoDaCelula(linha[colunas.variacao]) : "";
 
@@ -250,6 +252,7 @@ function converterMatriz(planilha: PlanilhaLida, colunas: ColunasMatriz): Result
 
       produtos.push({
         nome: nomeProduto,
+        categoria: categoria || undefined,
         detalhes: detalhes || undefined,
         variacao: variacao || undefined,
         embalagem: coluna.embalagem,

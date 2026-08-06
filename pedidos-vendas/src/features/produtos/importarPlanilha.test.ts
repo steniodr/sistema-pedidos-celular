@@ -218,39 +218,59 @@ describe("converter — formato matriz (molde oficial da tabela de preços)", ()
     ]);
   });
 
-  it("explode cada linha em uma entrada por embalagem preenchida, com nome e detalhes separados", () => {
+  it("explode cada linha em uma entrada por embalagem preenchida, com categoria, nome e detalhes separados", () => {
     const { produtos } = converter(planilha);
+    const categoriaEsmaltes = "Esmaltes, Vernizes e Resinas Multiúso base Solvente";
     const detalhesVariante = "exceto amarelo, laranja e vermelho";
     expect(produtos).toEqual([
       {
         nome: "Esmalte sintético brilhante",
+        categoria: categoriaEsmaltes,
         detalhes: detalhesVariante,
         embalagem: "Galão 3,6 L",
         valorUnit: 95.64,
       },
       {
         nome: "Esmalte sintético brilhante",
+        categoria: categoriaEsmaltes,
         detalhes: detalhesVariante,
         embalagem: "1/4 900 ml",
         valorUnit: 31.25,
       },
       {
         nome: "Esmalte sintético brilhante",
+        categoria: categoriaEsmaltes,
         detalhes: detalhesVariante,
         embalagem: "Lata 18 L",
         valorUnit: 453.31,
       },
       {
         nome: "Esmalte sintético brilhante",
+        categoria: categoriaEsmaltes,
         detalhes: detalhesVariante,
         embalagem: "Tambor 180 L",
         valorUnit: 3994.44,
       },
-      { nome: "Esmalte sintético metálico", embalagem: "Galão 3,6 L", valorUnit: 127.1 },
-      { nome: "Esmalte sintético metálico", embalagem: "1/4 900 ml", valorUnit: 40.16 },
-      { nome: "Esmalte sintético metálico", embalagem: "Tambor 180 L", valorUnit: 5521.92 },
-      { nome: "Aguarrás", embalagem: "1/4 900 ml", valorUnit: 18.1 },
-      { nome: "Aguarrás", embalagem: "Lata 18 L", valorUnit: 327.77 },
+      {
+        nome: "Esmalte sintético metálico",
+        categoria: categoriaEsmaltes,
+        embalagem: "Galão 3,6 L",
+        valorUnit: 127.1,
+      },
+      {
+        nome: "Esmalte sintético metálico",
+        categoria: categoriaEsmaltes,
+        embalagem: "1/4 900 ml",
+        valorUnit: 40.16,
+      },
+      {
+        nome: "Esmalte sintético metálico",
+        categoria: categoriaEsmaltes,
+        embalagem: "Tambor 180 L",
+        valorUnit: 5521.92,
+      },
+      { nome: "Aguarrás", categoria: "Solventes", embalagem: "1/4 900 ml", valorUnit: 18.1 },
+      { nome: "Aguarrás", categoria: "Solventes", embalagem: "Lata 18 L", valorUnit: 327.77 },
     ]);
   });
 
@@ -296,6 +316,7 @@ describe("converter — matriz com coluna Variação (tamanho/tipo, independente
     expect(produtos).toEqual([
       {
         nome: "Arenito glitz",
+        categoria: "Texturas",
         detalhes: "base clara/escura e cores",
         variacao: "fino",
         embalagem: "Galão 3,6 L",
@@ -303,6 +324,7 @@ describe("converter — matriz com coluna Variação (tamanho/tipo, independente
       },
       {
         nome: "Arenito glitz",
+        categoria: "Texturas",
         detalhes: "base clara/escura e cores",
         variacao: "fino",
         embalagem: "Lata 18 L",
@@ -310,6 +332,7 @@ describe("converter — matriz com coluna Variação (tamanho/tipo, independente
       },
       {
         nome: "Arenito glitz",
+        categoria: "Texturas",
         detalhes: "base clara/escura e cores",
         variacao: "médio",
         embalagem: "Galão 3,6 L",
@@ -317,13 +340,24 @@ describe("converter — matriz com coluna Variação (tamanho/tipo, independente
       },
       {
         nome: "Arenito glitz",
+        categoria: "Texturas",
         detalhes: "base clara/escura e cores",
         variacao: "médio",
         embalagem: "Lata 18 L",
         valorUnit: 565.2,
       },
-      { nome: "Esmalte sintético brilhante", embalagem: "Galão 3,6 L", valorUnit: 95.64 },
-      { nome: "Esmalte sintético brilhante", embalagem: "Lata 18 L", valorUnit: 453.31 },
+      {
+        nome: "Esmalte sintético brilhante",
+        categoria: "Esmaltes",
+        embalagem: "Galão 3,6 L",
+        valorUnit: 95.64,
+      },
+      {
+        nome: "Esmalte sintético brilhante",
+        categoria: "Esmaltes",
+        embalagem: "Lata 18 L",
+        valorUnit: 453.31,
+      },
     ]);
     // Nenhum aviso de "valor inválido" pra coluna Variação (regressão: antes de
     // detectá-la como coluna própria, "fino"/"médio" caíam no loop de embalagem

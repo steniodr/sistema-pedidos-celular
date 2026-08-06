@@ -11,7 +11,14 @@ import { lerNumeroBR } from "../../domain/calculos";
 import { mensagemErro } from "../../domain/erros";
 import type { EntradaProdutoUnico } from "../../data/repository";
 
-const VAZIO: EntradaProdutoUnico = { nome: "", detalhes: "", variacao: "", embalagem: "", valorUnit: 0 };
+const VAZIO: EntradaProdutoUnico = {
+  nome: "",
+  categoria: "",
+  detalhes: "",
+  variacao: "",
+  embalagem: "",
+  valorUnit: 0,
+};
 
 export function ProdutoFormPage() {
   const repo = useRepository();
@@ -53,6 +60,7 @@ export function ProdutoFormPage() {
         ...form,
         id,
         nome: form.nome.trim(),
+        categoria: form.categoria?.trim() || undefined,
         detalhes: form.detalhes?.trim() || undefined,
         variacao: form.variacao?.trim() || undefined,
         valorUnit: lerNumeroBR(valorTexto) ?? 0,
@@ -96,6 +104,12 @@ export function ProdutoFormPage() {
         value={form.nome}
         erro={erroNome}
         onChange={(e) => campo("nome", e.target.value)}
+      />
+      <Input
+        rotulo="Categoria"
+        value={form.categoria ?? ""}
+        onChange={(e) => campo("categoria", e.target.value)}
+        ajuda="Usada pra agrupar vendas por categoria em Relatórios (opcional)."
       />
       <Input
         rotulo="Detalhes"

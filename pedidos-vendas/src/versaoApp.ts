@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.7";
+export const VERSAO_APP = "1.8";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,14 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.8",
+    data: "2026-08-05",
+    itens: [
+      "Relatórios: tela reformulada — alterna entre visão \"Por produto\" (agrupado por Categoria, com detalhe de quais produtos mais venderam dentro dela) e \"Por cliente\"; gráfico de rosca colorido com a distribuição geral e legenda clicável, e gráfico de linha mostrando a evolução ao longo do tempo ao detalhar uma categoria, produto ou cliente específico",
+      "Base de produtos: novo campo Categoria (capturado automaticamente da planilha de preços), usado pelo agrupamento de Relatórios — produto sem categoria (base antiga, ainda não reimportada) entra como \"Sem categoria\"",
+    ],
+  },
   {
     versao: "1.7",
     data: "2026-08-05",

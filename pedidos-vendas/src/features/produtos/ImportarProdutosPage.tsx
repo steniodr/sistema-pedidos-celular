@@ -258,6 +258,7 @@ export function ImportarProdutosPage() {
                   {resultado.produtos.slice(0, 10).map((p, i) => (
                     <tr key={i}>
                       <td>
+                        {p.categoria ? `${p.categoria} · ` : ""}
                         {p.nome}
                         {p.detalhes ? ` (${p.detalhes})` : ""}
                         {p.variacao ? ` · ${p.variacao}` : ""}

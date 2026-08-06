@@ -34,6 +34,8 @@ export interface Cliente {
 export interface Produto {
   id: string;
   nome: string;
+  /** Categoria da tabela de preços (ex.: "Texturas/Revestimentos"), usada em Relatórios. */
+  categoria?: string;
   /** Variante/observação da tabela de preços (ex.: "exceto amarelo, laranja e vermelho"). */
   detalhes?: string;
   /**
