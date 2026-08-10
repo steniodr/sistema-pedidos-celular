@@ -30,6 +30,7 @@ export function ProdutoFormPage() {
   const [form, setForm] = useState<EntradaProdutoUnico>(VAZIO);
   const [valorTexto, setValorTexto] = useState("");
   const [erroNome, setErroNome] = useState<string | undefined>();
+  const [erroValor, setErroValor] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
@@ -49,10 +50,22 @@ export function ProdutoFormPage() {
     setForm((atual) => ({ ...atual, [chave]: valor }));
   }
 
+  /** `null` só quando o texto é um número válido maior que zero. */
+  function validarValor(texto: string): string | undefined {
+    const numero = lerNumeroBR(texto);
+    if (numero === null) return "Informe um valor numérico (ex.: 95,64).";
+    if (numero <= 0) return "O valor precisa ser maior que zero.";
+    return undefined;
+  }
+
   async function salvar() {
     const nomeOk = form.nome.trim().length > 0;
     setErroNome(nomeOk ? undefined : "Informe o nome do produto.");
-    if (!nomeOk) return;
+
+    const erroValorAtual = validarValor(valorTexto);
+    setErroValor(erroValorAtual);
+
+    if (!nomeOk || erroValorAtual) return;
 
     setSalvando(true);
     try {
@@ -63,6 +76,9 @@ export function ProdutoFormPage() {
         categoria: form.categoria?.trim() || undefined,
         detalhes: form.detalhes?.trim() || undefined,
         variacao: form.variacao?.trim() || undefined,
+        // validarValor já garantiu que é um número > 0 — lerNumeroBR aqui
+        // nunca deveria devolver null, mas o fallback evita salvar NaN/undefined
+        // se esse invariante mudar no futuro.
         valorUnit: lerNumeroBR(valorTexto) ?? 0,
       });
       toast.sucesso("Produto salvo.");
@@ -133,7 +149,9 @@ export function ProdutoFormPage() {
         obrigatorio
         inputMode="decimal"
         value={valorTexto}
+        erro={erroValor}
         onChange={(e) => setValorTexto(e.target.value)}
+        onBlur={() => setErroValor(validarValor(valorTexto))}
       />
 
       {id && (

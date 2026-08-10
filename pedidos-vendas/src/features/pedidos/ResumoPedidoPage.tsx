@@ -18,6 +18,7 @@ export function ResumoPedidoPage() {
   const navigate = useNavigate();
   const { pedido, carregando, atualizar } = usePedido(id);
   const [descontoTexto, setDescontoTexto] = useState("");
+  const [erroDesconto, setErroDesconto] = useState<string | undefined>();
 
   useEffect(() => {
     if (pedido) setDescontoTexto(pedido.descontoValor ? String(pedido.descontoValor).replace(".", ",") : "");
@@ -72,9 +73,25 @@ export function ResumoPedidoPage() {
           rotulo={pedido.descontoTipo === "percentual" ? "Percentual" : "Valor (R$)"}
           inputMode="decimal"
           value={descontoTexto}
+          erro={erroDesconto}
           onChange={(e) => {
-            setDescontoTexto(e.target.value);
-            atualizar({ descontoValor: lerNumeroBR(e.target.value) ?? 0 });
+            const texto = e.target.value;
+            setDescontoTexto(texto);
+            setErroDesconto(undefined);
+            if (texto.trim() === "") {
+              atualizar({ descontoValor: 0 });
+              return;
+            }
+            const numero = lerNumeroBR(texto);
+            // Só sincroniza com o pedido quando o texto já é um número válido —
+            // evita zerar o desconto a cada tecla enquanto o vendedor ainda
+            // está no meio de digitar um decimal (ex.: "1," antes de "1,5").
+            if (numero !== null) atualizar({ descontoValor: numero });
+          }}
+          onBlur={() => {
+            if (descontoTexto.trim() !== "" && lerNumeroBR(descontoTexto) === null) {
+              setErroDesconto("Informe um número válido.");
+            }
           }}
         />
       </div>

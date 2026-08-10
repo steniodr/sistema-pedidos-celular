@@ -254,6 +254,45 @@ describe("fluxo do pedido", () => {
     expect(dados.itens[0].descricaoProduto).toBe("Esmalte Premium Linha Ouro");
   });
 
+  it("avisa quando quantidade ou valor unitário não são números válidos, e bloqueia salvar", async () => {
+    await dexieRepository.substituirBaseProdutos(
+      [{ nome: "Esmalte sintético brilhante", embalagem: "Galão (3,6 L)", valorUnit: 95.64 }],
+      "tabela-teste.xlsx",
+    );
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "ARARA AZUL" });
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    await screen.findByRole("heading", { name: "Adicionar item" });
+    await preencher(/^Produto/, "esmalte");
+    await userEvent.click(await screen.findByText("Esmalte sintético brilhante"));
+    await userEvent.click(await screen.findByRole("button", { name: "Galão (3,6 L)" }));
+
+    // Quantidade com texto inválido: erro ao sair do campo, botão continua desabilitado.
+    const campoQtd = screen.getByLabelText(/^Quantidade/);
+    await userEvent.clear(campoQtd);
+    await userEvent.type(campoQtd, "abc");
+    await userEvent.tab();
+    expect(await screen.findByText("Informe um número válido.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Salvar item" }).hasAttribute("disabled")).toBe(true);
+
+    // Corrige a quantidade — o erro some e o valor unitário (preenchido pela
+    // embalagem escolhida) continua válido, então dá pra salvar normalmente.
+    await userEvent.clear(campoQtd);
+    await userEvent.type(campoQtd, "2");
+    await userEvent.tab();
+    expect(screen.queryByText("Informe um número válido.")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.itens).toHaveLength(1);
+    });
+  });
+
   it("bloqueia a exportação quando o CPF/CNPJ é inválido", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Sem Documento",
@@ -279,6 +318,30 @@ describe("fluxo do pedido", () => {
     abrir(`/pedidos/${pedido.id}/finalizar`);
     expect(await screen.findByText(/CPF\/CNPJ do cliente é inválido/)).toBeDefined();
 
+    const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
+    expect(botao.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("bloqueia a exportação quando o número do pedido é limpo (zero/inválido)", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Válido",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    await screen.findByRole("heading", { name: "Finalizar pedido" });
+    // userEvent.type não aceita string vazia — só limpar já dispara o onChange
+    // com o campo em branco, que é o caso que queremos testar.
+    await userEvent.clear(screen.getByLabelText(/^Número do pedido/));
+
+    expect(await screen.findByText("O número do pedido é obrigatório.")).toBeDefined();
     const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
     expect(botao.hasAttribute("disabled")).toBe(true);
   });
@@ -416,6 +479,35 @@ describe("fluxo do pedido", () => {
     expect(totais.desconto).toBe(100);
     expect(totais.total).toBe(1400);
   });
+
+  it("desconto: texto inválido no campo avisa e não zera o valor já aplicado", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+      descontoTipo: "valor",
+      descontoValor: 10,
+    });
+
+    abrir(`/pedidos/${pedido.id}/resumo`);
+    await screen.findByRole("heading", { name: "Resumo do pedido" });
+    expect(await screen.findByText("R$ 90,00")).toBeDefined(); // total já com os R$ 10 de desconto
+
+    // Digita em cima do valor existente ("10"), sem limpar antes — texto vira
+    // "10abc", inválido. Sai do campo (tab) pra disparar a validação de erro.
+    const campoDesconto = screen.getByLabelText(/Valor \(R\$\)/);
+    await userEvent.type(campoDesconto, "abc");
+    await userEvent.tab();
+
+    expect(await screen.findByText("Informe um número válido.")).toBeDefined();
+    // O desconto de R$ 10 continua valendo — texto inválido não zera silenciosamente.
+    const pedidoAtual = await dexieRepository.obterPedido(pedido.id);
+    expect(pedidoAtual?.descontoValor).toBe(10);
+  });
 });
 
 describe("histórico", () => {
@@ -530,6 +622,42 @@ describe("clientes de teste", () => {
     await waitFor(async () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(1);
     });
+  });
+});
+
+describe("produtos", () => {
+  it("bloqueia salvar produto com valor unitário inválido, sem gravar nada", async () => {
+    abrir("/produtos/novo");
+    await preencher(/^Nome/, "Produto Teste");
+    await preencher(/Valor unitário/, "abc");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect(await screen.findByText("Informe um valor numérico (ex.: 95,64).")).toBeDefined();
+    expect(await dexieRepository.listarProdutos()).toHaveLength(0);
+  });
+
+  it("bloqueia salvar produto com valor zero ou negativo", async () => {
+    abrir("/produtos/novo");
+    await preencher(/^Nome/, "Produto Teste");
+    await preencher(/Valor unitário/, "0");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect(await screen.findByText("O valor precisa ser maior que zero.")).toBeDefined();
+    expect(await dexieRepository.listarProdutos()).toHaveLength(0);
+  });
+
+  it("salva o produto normalmente com um valor numérico válido", async () => {
+    abrir("/produtos/novo");
+    await preencher(/^Nome/, "Produto Teste");
+    await preencher(/Valor unitário/, "95,64");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    await waitFor(async () => {
+      expect(await dexieRepository.listarProdutos()).toHaveLength(1);
+    });
+    const [produto] = await dexieRepository.listarProdutos();
+    expect(produto.valorUnit).toBe(95.64);
+    expect(typeof produto.valorUnit).toBe("number");
   });
 });
 

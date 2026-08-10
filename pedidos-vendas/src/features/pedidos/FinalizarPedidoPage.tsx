@@ -70,6 +70,7 @@ export function FinalizarPedidoPage() {
     }
   }
   if (pedido.itens.length === 0) pendencias.push("O pedido não tem itens.");
+  if (pedido.numero <= 0) pendencias.push("O número do pedido é obrigatório.");
   if (numeroDuplicado) {
     pendencias.push(`Já existe outro pedido com o número ${pedido.numero} — altere antes de exportar.`);
   }
@@ -179,7 +180,13 @@ export function FinalizarPedidoPage() {
         obrigatorio
         inputMode="numeric"
         type="number"
-        erro={numeroDuplicado ? "Já existe outro pedido com esse número." : undefined}
+        erro={
+          pedido.numero <= 0
+            ? "Informe um número válido."
+            : numeroDuplicado
+              ? "Já existe outro pedido com esse número."
+              : undefined
+        }
         value={pedido.numero}
         onChange={(e) => atualizar({ numero: Number(e.target.value) || 0 })}
       />

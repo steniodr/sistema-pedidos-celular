@@ -52,6 +52,8 @@ export function ItemPedidoPage() {
   const [comDesconto, setComDesconto] = useState(false);
   const [qtdTexto, setQtdTexto] = useState("1");
   const [valorTexto, setValorTexto] = useState("");
+  const [erroQtd, setErroQtd] = useState<string | undefined>();
+  const [erroValorUnit, setErroValorUnit] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -98,6 +100,7 @@ export function ItemPedidoPage() {
     setEmbalagem("");
     setEmbalagemOutro(false);
     setValorTexto("");
+    setErroValorUnit(undefined);
     setDetalheEscolhido(null);
     setVariacaoEscolhida(null);
     setAlterarNomeExportado(false);
@@ -181,7 +184,12 @@ export function ItemPedidoPage() {
     setEmbalagemOutro(false);
     setEmbalagem(valor);
     const correspondente = opcoesEmbalagem.find((o) => o.embalagem === valor);
-    if (correspondente) setValorTexto(String(correspondente.valorUnit).replace(".", ","));
+    if (correspondente) {
+      setValorTexto(String(correspondente.valorUnit).replace(".", ","));
+      // O preço veio do catálogo, não do que o vendedor tinha digitado antes —
+      // um erro de validação de uma tentativa anterior não se aplica mais.
+      setErroValorUnit(undefined);
+    }
   }
 
   function alternarComDesconto(valor: boolean) {
@@ -196,6 +204,14 @@ export function ItemPedidoPage() {
     const atual = lerNumeroBR(qtdTexto) ?? 0;
     const novo = Math.max(1, atual + delta);
     setQtdTexto(String(novo).replace(".", ","));
+    setErroQtd(undefined);
+  }
+
+  function validarNumeroPositivo(texto: string): string | undefined {
+    const numero = lerNumeroBR(texto);
+    if (numero === null) return "Informe um número válido.";
+    if (numero <= 0) return "Precisa ser maior que zero.";
+    return undefined;
   }
 
   const qtd = lerNumeroBR(qtdTexto) ?? 0;
@@ -407,7 +423,9 @@ export function ItemPedidoPage() {
           obrigatorio
           inputMode="decimal"
           value={qtdTexto}
+          erro={erroQtd}
           onChange={(e) => setQtdTexto(e.target.value)}
+          onBlur={() => setErroQtd(validarNumeroPositivo(qtdTexto))}
         />
         <Button
           variante="secundario"
@@ -429,7 +447,9 @@ export function ItemPedidoPage() {
         obrigatorio
         inputMode="decimal"
         value={valorTexto}
+        erro={erroValorUnit}
         onChange={(e) => setValorTexto(e.target.value)}
+        onBlur={() => setErroValorUnit(validarNumeroPositivo(valorTexto))}
       />
       <Textarea
         rotulo="Observação do item"
