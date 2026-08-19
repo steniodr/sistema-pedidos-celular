@@ -203,6 +203,38 @@ describe("montarDadosExportacao — transportadora e local de entrega", () => {
   });
 });
 
+describe("montarDadosExportacao — orçamento (sem número de pedido de verdade)", () => {
+  it("usa o código do orçamento no lugar do número quando somenteOrcamento", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(
+      { ...pedido, somenteOrcamento: true, codigoOrcamento: "ORC01" },
+      cliente,
+    );
+    expect(dados.numero).toBe("ORC01");
+  });
+
+  it("usa o número normal quando não é orçamento, mesmo com um código antigo gravado", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(
+      { ...pedido, somenteOrcamento: false, codigoOrcamento: "ORC01" },
+      cliente,
+    );
+    expect(dados.numero).toBe(42);
+  });
+});
+
 describe("nomeArquivo", () => {
   it("continua funcionando normalmente", () => {
     const pedido = pedidoComItem({
@@ -214,5 +246,20 @@ describe("nomeArquivo", () => {
     });
     const dados = montarDadosExportacao(pedido, cliente);
     expect(nomeArquivo(dados, "xlsx")).toBe("pedido-42-tintas-do-vale-ltda.xlsx");
+  });
+
+  it("usa o prefixo 'orcamento' quando o número exportado é o código ORC", () => {
+    const pedido = pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    });
+    const dados = montarDadosExportacao(
+      { ...pedido, somenteOrcamento: true, codigoOrcamento: "ORC01" },
+      cliente,
+    );
+    expect(nomeArquivo(dados, "xlsx")).toBe("orcamento-ORC01-tintas-do-vale-ltda.xlsx");
   });
 });

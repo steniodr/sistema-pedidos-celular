@@ -35,6 +35,9 @@ export function PedidoPage() {
   }
 
   const { total } = totaisPedido(pedido);
+  const identificador = pedido.somenteOrcamento
+    ? `Orçamento ${pedido.codigoOrcamento}`
+    : `Pedido nº ${pedido.numero}`;
 
   async function removerItem(indice: number) {
     if (!pedido) return;
@@ -46,8 +49,11 @@ export function PedidoPage() {
 
   async function excluirPedido() {
     if (!pedido) return;
+    const rotulo = pedido.somenteOrcamento
+      ? `orçamento ${pedido.codigoOrcamento}`
+      : `pedido nº ${pedido.numero}`;
     const ok = await confirmar({
-      mensagem: `Excluir o pedido nº ${pedido.numero}? Esta ação não pode ser desfeita.`,
+      mensagem: `Excluir o ${rotulo}? Esta ação não pode ser desfeita.`,
       textoConfirmar: "Excluir",
       perigo: true,
     });
@@ -67,7 +73,7 @@ export function PedidoPage() {
   }
 
   return (
-    <Tela titulo={`Pedido nº ${pedido.numero}`} voltar="/" comBarraInferior>
+    <Tela titulo={identificador} voltar="/" comBarraInferior>
       <Cartao>
         <div className="texto-forte">{cliente?.nome ?? "Cliente removido"}</div>
         <div className="texto-suave">{pedido.marca || "Sem marca"}</div>

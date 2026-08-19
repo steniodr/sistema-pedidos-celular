@@ -6,7 +6,8 @@ import type { Cliente, Pedido } from "../../domain/types";
 
 /** Recorte do pedido pronto para exportar — o Excel e o PDF consomem exatamente isto. */
 export interface DadosExportacao {
-  numero: number;
+  /** Número do pedido normal, ou o código do orçamento (ex.: "ORC01") quando o pedido é só um orçamento. */
+  numero: number | string;
   marca: string;
   dataPedido: string;
   formaSolicitacao: string;
@@ -51,7 +52,7 @@ export function montarDadosExportacao(
   const totais = totaisPedido(pedido);
 
   return {
-    numero: pedido.numero,
+    numero: pedido.somenteOrcamento && pedido.codigoOrcamento ? pedido.codigoOrcamento : pedido.numero,
     marca: pedido.marca ?? "",
     dataPedido: formatarData(pedido.dataPedido),
     formaSolicitacao: pedido.formaSolicitacao ?? "",
@@ -111,7 +112,10 @@ export function nomeArquivo(dados: DadosExportacao, extensao: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, 40);
   const sufixo = cliente ? `-${cliente}` : "";
-  return `pedido-${dados.numero}${sufixo}.${extensao}`;
+  // Orçamento tem "numero" como string (o código ORC...) — prefixo do
+  // arquivo acompanha, pra não sair "pedido-ORC01" (ainda não é um pedido).
+  const prefixo = typeof dados.numero === "string" ? "orcamento" : "pedido";
+  return `${prefixo}-${dados.numero}${sufixo}.${extensao}`;
 }
 
 export function baixarArquivo(blob: Blob, nome: string): void {

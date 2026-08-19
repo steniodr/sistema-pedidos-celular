@@ -54,9 +54,12 @@ export interface Repository {
   restaurarPedido(pedido: Pedido): Promise<void>;
   criarPedido(dados: NovoPedido): Promise<Pedido>;
   duplicarPedido(id: string): Promise<Pedido>;
-  proximoNumeroPedido(): Promise<number>;
+  /** `excluirId` ignora o próprio pedido no cálculo — usado ao reatribuir número de um pedido já existente (ex.: sair de "Somente orçamento"), pra não subir a cada ida-e-volta. */
+  proximoNumeroPedido(excluirId?: string): Promise<number>;
   /** `true` se já existe OUTRO pedido com esse número (`excluirId` ignora o próprio pedido ao editar). */
   existeNumeroPedido(numero: number, excluirId?: string): Promise<boolean>;
+  /** Próximo código de orçamento disponível (ex.: "ORC01", "ORC02"...) — contador próprio, independente de `numero`. */
+  proximoCodigoOrcamento(): Promise<string>;
 
   // Check-in (visita ao cliente, independente de pedido)
   listarCheckIns(filtro?: FiltroCheckIns): Promise<CheckIn[]>;

@@ -101,6 +101,15 @@ export interface Pedido {
   /** Justificativa do desconto (quem autorizou, motivo), opcional. */
   descontoDescricao?: string;
   status: StatusPedido;
+  /**
+   * Pedido é só um orçamento — `numero` fica de fora (não é pedido nem
+   * exibido), usa `codigoOrcamento` no lugar dele na tela e na exportação.
+   * Excluído dos totais de Relatórios, igual a `teste`, até virar pedido de
+   * verdade (desmarcado em Finalizar, que aí sim sugere o próximo número).
+   */
+  somenteOrcamento?: boolean;
+  /** Código gerado automaticamente pra orçamentos (ex.: "ORC01") — contador próprio, independente de `numero`. */
+  codigoOrcamento?: string;
   /** Criado pelo gerador de dados de teste (Configurações) — excluído dos totais de Relatórios. */
   teste?: boolean;
   criadoEm: ISODateTime;

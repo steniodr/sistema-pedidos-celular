@@ -67,7 +67,14 @@ export function ResumoPedidoPage() {
         <Chips
           opcoes={["%", "R$"] as const}
           valor={rotuloTipo}
-          onChange={(rotulo) => atualizar({ descontoTipo: TIPOS[rotulo] })}
+          onChange={(rotulo) => {
+            // Limpa o valor ao trocar de tipo — "10" como percentual e "10"
+            // como R$ são coisas bem diferentes; reaproveitar o número digitado
+            // sob a unidade errada é o bug que motivou isso (ver histórico).
+            atualizar({ descontoTipo: TIPOS[rotulo], descontoValor: 0 });
+            setDescontoTexto("");
+            setErroDesconto(undefined);
+          }}
         />
         <Input
           rotulo={pedido.descontoTipo === "percentual" ? "Percentual" : "Valor (R$)"}

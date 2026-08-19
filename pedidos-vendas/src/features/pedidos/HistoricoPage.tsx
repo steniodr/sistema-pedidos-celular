@@ -164,7 +164,9 @@ export function HistoricoPage() {
             return (
               <Cartao key={pedido.id}>
                 <div className="linha linha--entre">
-                  <span className="texto-forte">Pedido nº {pedido.numero}</span>
+                  <span className="texto-forte">
+                    {pedido.somenteOrcamento ? `Orçamento ${pedido.codigoOrcamento}` : `Pedido nº ${pedido.numero}`}
+                  </span>
                   <span className="texto-forte">{formatarMoeda(total)}</span>
                 </div>
                 <div className="texto-suave">
@@ -172,6 +174,7 @@ export function HistoricoPage() {
                   {pedido.marca || "Sem marca"} · {formatarData(pedido.dataPedido)} ·{" "}
                   <StatusPedidoTag status={pedido.status} />
                   {pedido.teste && <span className={css.tagTeste}>Teste</span>}
+                  {pedido.somenteOrcamento && <span className={css.tagTeste}>Orçamento</span>}
                 </div>
                 <div className={css.acoesItem}>
                   <Button variante="fantasma" onClick={() => duplicar(pedido.id)}>

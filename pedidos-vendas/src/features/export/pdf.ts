@@ -64,7 +64,9 @@ export async function gerarPdf(dados: DadosExportacao): Promise<Blob> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.text(dados.marca || "Pedido", MARGEM, y);
-  doc.text(`Pedido nº ${dados.numero}`, LARGURA_A4 - MARGEM, y, { align: "right" });
+  // Orçamento tem "numero" como string (o código ORC...) — rótulo acompanha.
+  const rotuloNumero = typeof dados.numero === "string" ? "Orçamento" : "Pedido nº";
+  doc.text(`${rotuloNumero} ${dados.numero}`, LARGURA_A4 - MARGEM, y, { align: "right" });
   y += 6;
 
   doc.setFont("helvetica", "normal");

@@ -69,9 +69,10 @@ export function RelatoriosPage() {
       // Dexie rejeita a consulta inteira).
       repo.listarProdutos(undefined, 1_000_000),
     ]);
-    // Pedidos gerados em Configurações → "Criar pedidos de teste" não são vendas
-    // reais — nunca entram nos números de Relatórios.
-    const enviados = enviadosBrutos.filter((p) => !p.teste);
+    // Pedidos gerados em Configurações → "Criar pedidos de teste" e orçamentos
+    // (ainda sem número de pedido de verdade) não são vendas reais — nunca
+    // entram nos números de Relatórios.
+    const enviados = enviadosBrutos.filter((p) => !p.teste && !p.somenteOrcamento);
     const nomePorClienteId = new Map(clientes.map((c) => [c.id, c.nome]));
     const categoriaPorNome = new Map(produtos.map((p) => [p.nome, p.categoria]));
     const marcas = [...new Set(enviados.map((p) => p.marca).filter(Boolean))];

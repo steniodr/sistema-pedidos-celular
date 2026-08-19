@@ -237,3 +237,63 @@ describe("dexieRepository — check-in", () => {
     expect(await dexieRepository.listarCheckIns()).toHaveLength(1);
   });
 });
+
+describe("dexieRepository — pedidos e código de orçamento", () => {
+  beforeEach(async () => {
+    await Promise.all([db.clientes.clear(), db.pedidos.clear()]);
+  });
+
+  async function novoPedido() {
+    const cliente = await dexieRepository.salvarCliente({ nome: "Cliente A", cpfCnpj: CPF_VALIDO });
+    return dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+  }
+
+  it("proximoCodigoOrcamento começa em ORC01 e incrementa a cada código já usado", async () => {
+    expect(await dexieRepository.proximoCodigoOrcamento()).toBe("ORC01");
+
+    const pedido = await novoPedido();
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+    });
+    expect(await dexieRepository.proximoCodigoOrcamento()).toBe("ORC02");
+
+    const pedido2 = await novoPedido();
+    await dexieRepository.salvarPedido({
+      ...pedido2,
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC02",
+    });
+    expect(await dexieRepository.proximoCodigoOrcamento()).toBe("ORC03");
+  });
+
+  it("duplicarPedido nunca carrega o orçamento (nem o código) do original", async () => {
+    const pedido = await novoPedido();
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+    });
+
+    const copia = await dexieRepository.duplicarPedido(pedido.id);
+    expect(copia.somenteOrcamento).toBe(false);
+    expect(copia.codigoOrcamento).toBeUndefined();
+    expect(copia.numero).not.toBe(pedido.numero);
+  });
+
+  it("proximoNumeroPedido com excluirId não conta o próprio pedido — repetir não sobe o número à toa", async () => {
+    const pedido = await novoPedido(); // numero 1, único na base
+    expect(await dexieRepository.proximoNumeroPedido(pedido.id)).toBe(1);
+    expect(await dexieRepository.proximoNumeroPedido(pedido.id)).toBe(1);
+    expect(await dexieRepository.proximoNumeroPedido(pedido.id)).toBe(1);
+
+    // Sem excluirId (caso de pedido novo de verdade), conta ele normalmente.
+    expect(await dexieRepository.proximoNumeroPedido()).toBe(2);
+
+    // Com um SEGUNDO pedido real na base, excluir o primeiro ainda respeita o segundo.
+    const pedido2 = await novoPedido(); // numero 2
+    expect(await dexieRepository.proximoNumeroPedido(pedido.id)).toBe(3);
+    expect(await dexieRepository.proximoNumeroPedido(pedido2.id)).toBe(2);
+  });
+});

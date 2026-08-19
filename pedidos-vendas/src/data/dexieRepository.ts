@@ -245,14 +245,36 @@ export const dexieRepository: Repository = {
     await db.pedidos.put(pedido);
   },
 
-  async proximoNumeroPedido() {
-    const ultimo = await db.pedidos.orderBy("numero").last();
-    return (ultimo?.numero ?? 0) + 1;
+  async proximoNumeroPedido(excluirId) {
+    // Sem excluirId (pedido novo): caminho rápido de sempre, via índice.
+    if (!excluirId) {
+      const ultimo = await db.pedidos.orderBy("numero").last();
+      return (ultimo?.numero ?? 0) + 1;
+    }
+    // Com excluirId (reatribuindo número de um pedido que já existe — ex.:
+    // desmarcar "Somente orçamento"): o próprio pedido não pode contar como
+    // "já existente" no cálculo, senão cada vez que ele reentra na conta o
+    // número sobe de novo, mesmo sem nenhum pedido novo ter sido criado.
+    const pedidos = await db.pedidos.orderBy("numero").reverse().toArray();
+    const maiorDosOutros = pedidos.find((p) => p.id !== excluirId);
+    return (maiorDosOutros?.numero ?? 0) + 1;
   },
 
   async existeNumeroPedido(numero, excluirId) {
     const iguais = await db.pedidos.where("numero").equals(numero).toArray();
     return iguais.some((p) => p.id !== excluirId);
+  },
+
+  async proximoCodigoOrcamento() {
+    // "codigoOrcamento" não é indexado (poucos registros, escaneia a tabela
+    // toda) — pega o maior número já usado no padrão "ORC<n>" e soma 1.
+    const pedidos = await db.pedidos.toArray();
+    let maior = 0;
+    for (const p of pedidos) {
+      const casado = /^ORC(\d+)$/.exec(p.codigoOrcamento ?? "");
+      if (casado) maior = Math.max(maior, Number(casado[1]));
+    }
+    return `ORC${String(maior + 1).padStart(2, "0")}`;
   },
 
   async criarPedido({ clienteId, marca }: NovoPedido) {
@@ -294,6 +316,11 @@ export const dexieRepository: Repository = {
       ...original,
       id: novoId(),
       numero: await this.proximoNumeroPedido(),
+      // Duplicar sempre gera um pedido de verdade, novo — não carrega o
+      // orçamento (e o código) do original, senão os dois ficariam com o
+      // mesmo "ORC..." apontando pra pedidos diferentes.
+      somenteOrcamento: false,
+      codigoOrcamento: undefined,
       dataPedido: momento.slice(0, 10),
       status: "rascunho",
       itens: original.itens.map((item) => ({ ...item })),

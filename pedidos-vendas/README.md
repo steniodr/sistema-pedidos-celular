@@ -201,7 +201,13 @@ pode ser marcado como "com desconto" (valor promocional avulso, com o campo
 Padrão/Complemento pré-preenchido "Valor promocional", já que esse campo
 aparece no Excel/PDF) — esse item fica de fora do cálculo do desconto geral
 do pedido. Em Finalizar: número do pedido editável (com aviso se já existe
-outro pedido com o mesmo número — bloqueia a exportação até corrigir), forma
+outro pedido com o mesmo número — bloqueia a exportação até corrigir), com
+checkbox **"Somente orçamento"** logo abaixo — dispensa o número (gera um
+código próprio, ex.: "ORC01", contador independente do número de pedido) e
+exclui o pedido dos totais de Relatórios, igual aos pedidos de teste, mas
+continua podendo ser exportado normalmente (Excel/PDF usam o código no lugar
+do número); ao desmarcar, volta a sugerir o próximo número de pedido
+disponível, que o vendedor pode ajustar. Forma
 de solicitação, condição de pagamento, transportadora e local de entrega
 como campos editáveis — os três últimos vêm pré-preenchidos do cadastro do
 cliente ao criar o pedido, com um botão "Usar do cliente" pra reaplicar se o
@@ -258,7 +264,7 @@ marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
 de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
 teste", sem afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.8`) com um
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.9`) com um
 ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
 sobre como o app garante que a versão instalada não fique presa numa build
 antiga.
@@ -266,7 +272,7 @@ antiga.
 **Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
 (Rascunho em amarelo, Enviado em verde).
 
-178 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
+194 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
 dos moldes Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

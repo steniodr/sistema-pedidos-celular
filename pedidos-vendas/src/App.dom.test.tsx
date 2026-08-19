@@ -508,6 +508,141 @@ describe("fluxo do pedido", () => {
     const pedidoAtual = await dexieRepository.obterPedido(pedido.id);
     expect(pedidoAtual?.descontoValor).toBe(10);
   });
+
+  it("desconto: trocar entre % e R$ limpa o valor, em vez de reinterpretar o mesmo número", async () => {
+    // Regressão: "10" como percentual (10% de desconto) virava "10" como R$
+    // (R$10 fixo) ao trocar o tipo, sem o vendedor perceber — o item
+    // promocional continuava excluído da base em ambos os casos, mas o
+    // *valor* do desconto mudava de sentido silenciosamente.
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Item normal", valorUnit: 1000 },
+        {
+          item: 2,
+          qtd: 1,
+          embalagem: "Galão",
+          descricaoProduto: "Item promocional",
+          valorUnit: 500,
+          comDesconto: true,
+        },
+      ],
+      descontoTipo: "percentual",
+      descontoValor: 10,
+    });
+
+    abrir(`/pedidos/${pedido.id}/resumo`);
+    await screen.findByRole("heading", { name: "Resumo do pedido" });
+    // 10% sobre os R$1000 descontáveis (item promocional de fora) = R$100 de desconto.
+    expect(await screen.findByText("R$ 1.400,00")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: "R$" }));
+
+    // Campo de valor limpo — não continua mostrando "10" reinterpretado como R$10.
+    const campoValor = screen.getByLabelText(/Valor \(R\$\)/) as HTMLInputElement;
+    expect(campoValor.value).toBe("");
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.descontoTipo).toBe("valor");
+      expect(salvo?.descontoValor).toBe(0);
+    });
+    // Sem desconto até o vendedor digitar um valor novo — subtotal e total
+    // ficam iguais ("R$ 1.500,00" aparece duas vezes, por isso findAllByText).
+    expect((await screen.findAllByText("R$ 1.500,00")).length).toBe(2);
+
+    await userEvent.type(campoValor, "50");
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.descontoValor).toBe(50);
+    });
+    // R$50 de desconto saem só do item descontável (1000 → 950); o
+    // promocional (500) continua intacto: total 1450, não 1450 - promo.
+    expect(await screen.findByText("R$ 1.450,00")).toBeDefined();
+  });
+
+  it("Somente orçamento: dispensa o número do pedido, usa um código ORC e não bloqueia exportar", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    await screen.findByRole("heading", { name: "Finalizar pedido" });
+    expect(screen.getByLabelText(/^Número do pedido/)).toBeDefined();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Somente orçamento" }));
+
+    // Campo de número some, entra o código do orçamento (somente leitura).
+    expect(screen.queryByLabelText(/^Número do pedido/)).toBeNull();
+    const campoCodigo = (await screen.findByLabelText(/Código do orçamento/)) as HTMLInputElement;
+    expect(campoCodigo.value).toBe("ORC01");
+    expect(campoCodigo).toHaveProperty("disabled", true);
+    expect(await screen.findByText("Orçamento ORC01")).toBeDefined();
+
+    // Exporta normalmente — não é bloqueado por falta de número de pedido.
+    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
+    expect(botaoExcel.hasAttribute("disabled")).toBe(false);
+    expect(screen.queryByText("O número do pedido é obrigatório.")).toBeNull();
+
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.somenteOrcamento).toBe(true);
+      expect(salvo?.codigoOrcamento).toBe("ORC01");
+    });
+
+    // Desmarca — volta a pedir número, com o próximo disponível já sugerido.
+    // Esse pedido é o único na base, então o "próximo disponível" (excluindo
+    // ele mesmo do cálculo) é o número que ele já tinha antes: 1.
+    await userEvent.click(screen.getByRole("checkbox", { name: "Somente orçamento" }));
+    expect(screen.queryByLabelText(/Código do orçamento/)).toBeNull();
+    const campoNumero = (await screen.findByLabelText(/^Número do pedido/)) as HTMLInputElement;
+    await waitFor(() => expect(campoNumero.value).toBe("1"));
+
+    const salvoFinal = await dexieRepository.obterPedido(pedido.id);
+    expect(salvoFinal?.somenteOrcamento).toBe(false);
+    expect(salvoFinal?.numero).toBe(1);
+  });
+
+  it("Somente orçamento: marcar e desmarcar várias vezes não fica subindo o número sem motivo", async () => {
+    // Regressão: proximoNumeroPedido() contava o próprio pedido (ainda com o
+    // número antigo gravado) como "já existente", então cada ida-e-volta sem
+    // nenhum pedido novo criado subia o número — 1, depois 2, depois 3...
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    await screen.findByRole("heading", { name: "Finalizar pedido" });
+    const checkbox = screen.getByRole("checkbox", { name: "Somente orçamento" });
+
+    for (let volta = 0; volta < 3; volta++) {
+      await userEvent.click(checkbox); // marca (orçamento)
+      await screen.findByLabelText(/Código do orçamento/);
+      await userEvent.click(checkbox); // desmarca (volta a ser pedido)
+      const campoNumero = (await screen.findByLabelText(/^Número do pedido/)) as HTMLInputElement;
+      await waitFor(() => expect(campoNumero.value).toBe("1"));
+    }
+
+    const salvoFinal = await dexieRepository.obterPedido(pedido.id);
+    expect(salvoFinal?.numero).toBe(1);
+  });
 });
 
 describe("histórico", () => {

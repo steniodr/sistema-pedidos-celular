@@ -4,7 +4,7 @@ import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/Confirm";
-import { Input } from "../../components/ui/Field";
+import { Checkbox, Input } from "../../components/ui/Field";
 import { SelectComOutro } from "../../components/ui/SelectComOutro";
 import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { StatusPedido } from "../../components/ui/StatusPedido";
@@ -70,9 +70,13 @@ export function FinalizarPedidoPage() {
     }
   }
   if (pedido.itens.length === 0) pendencias.push("O pedido não tem itens.");
-  if (pedido.numero <= 0) pendencias.push("O número do pedido é obrigatório.");
-  if (numeroDuplicado) {
-    pendencias.push(`Já existe outro pedido com o número ${pedido.numero} — altere antes de exportar.`);
+  // Orçamento não tem (nem precisa de) número de pedido — usa o código
+  // próprio (ORC...) no lugar, então essas duas validações não se aplicam.
+  if (!pedido.somenteOrcamento) {
+    if (pedido.numero <= 0) pendencias.push("O número do pedido é obrigatório.");
+    if (numeroDuplicado) {
+      pendencias.push(`Já existe outro pedido com o número ${pedido.numero} — altere antes de exportar.`);
+    }
   }
 
   const totais = totaisPedido(pedido);
@@ -125,6 +129,22 @@ export function FinalizarPedidoPage() {
     }
   }
 
+  async function alternarSomenteOrcamento(valor: boolean) {
+    if (!pedido) return;
+    if (valor) {
+      const codigo = pedido.codigoOrcamento ?? (await repo.proximoCodigoOrcamento());
+      await atualizar({ somenteOrcamento: true, codigoOrcamento: codigo });
+    } else {
+      // Volta a ser um pedido de verdade — sugere o próximo número
+      // disponível (o antigo pode já ter sido usado por outro pedido
+      // enquanto este ficou parado como orçamento); o vendedor pode ajustar.
+      // Exclui o próprio pedido do cálculo — senão marcar/desmarcar várias
+      // vezes ia subir o número toda hora, mesmo sem pedido novo nenhum.
+      const numero = await repo.proximoNumeroPedido(pedido.id);
+      await atualizar({ somenteOrcamento: false, numero });
+    }
+  }
+
   async function usarCondicaoPagamentoDoCliente() {
     await atualizar({ condicaoPagamento: cliente?.condicaoPagamento ?? "" });
   }
@@ -159,7 +179,9 @@ export function FinalizarPedidoPage() {
     >
       <Cartao>
         <div className="linha linha--entre">
-          <span className="texto-forte">Pedido nº {pedido.numero}</span>
+          <span className="texto-forte">
+            {pedido.somenteOrcamento ? `Orçamento ${pedido.codigoOrcamento}` : `Pedido nº ${pedido.numero}`}
+          </span>
           <span className="texto-forte">{formatarMoeda(totais.total)}</span>
         </div>
         <div className="texto-suave">
@@ -175,20 +197,36 @@ export function FinalizarPedidoPage() {
       ))}
 
       <h2 className="secao-titulo">Dados do pedido</h2>
-      <Input
-        rotulo="Número do pedido"
-        obrigatorio
-        inputMode="numeric"
-        type="number"
-        erro={
-          pedido.numero <= 0
-            ? "Informe um número válido."
-            : numeroDuplicado
-              ? "Já existe outro pedido com esse número."
-              : undefined
-        }
-        value={pedido.numero}
-        onChange={(e) => atualizar({ numero: Number(e.target.value) || 0 })}
+      {pedido.somenteOrcamento ? (
+        <Input
+          rotulo="Código do orçamento"
+          value={pedido.codigoOrcamento ?? ""}
+          readOnly
+          disabled
+          ajuda="Gerado automaticamente. Vira o número do pedido quando 'Somente orçamento' for desmarcado."
+        />
+      ) : (
+        <Input
+          rotulo="Número do pedido"
+          obrigatorio
+          inputMode="numeric"
+          type="number"
+          erro={
+            pedido.numero <= 0
+              ? "Informe um número válido."
+              : numeroDuplicado
+                ? "Já existe outro pedido com esse número."
+                : undefined
+          }
+          value={pedido.numero}
+          onChange={(e) => atualizar({ numero: Number(e.target.value) || 0 })}
+        />
+      )}
+      <Checkbox
+        rotulo="Somente orçamento"
+        checked={pedido.somenteOrcamento ?? false}
+        onChange={alternarSomenteOrcamento}
+        ajuda="Sem número de pedido ainda — usa um código próprio (ex.: ORC01). Pode ser exportado normalmente pra mandar pro cliente; desmarque quando virar um pedido de verdade."
       />
       <Input
         rotulo="Data do pedido"

@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.8";
+export const VERSAO_APP = "1.9";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,13 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.9",
+    data: "2026-08-18",
+    itens: [
+      "Finalizar pedido: novo checkbox \"Somente orçamento\" logo abaixo do número do pedido — dispensa o número (gera um código próprio, ex.: \"ORC01\") e não conta nos totais de Relatórios, igual aos pedidos de teste; continua podendo ser exportado em Excel/PDF normalmente, usando o código no lugar do número. Ao desmarcar, volta a sugerir o próximo número de pedido disponível (editável)",
+    ],
+  },
   {
     versao: "1.8",
     data: "2026-08-05",
