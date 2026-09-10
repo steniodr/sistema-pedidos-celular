@@ -33,9 +33,15 @@ export function usePedido(id: string | undefined) {
       if (!pedido) return;
       const atualizado = { ...pedido, ...mudancas };
       setPedido(atualizado);
+      // Trocou de cliente (ex.: "Trocar cliente" na tela do pedido) — recarrega
+      // `cliente` junto, na mesma chamada, pra não deixar o nome antigo exibido
+      // até o próximo efeito.
+      if (mudancas.clienteId && mudancas.clienteId !== pedido.clienteId) {
+        setCliente(await repo.obterCliente(mudancas.clienteId));
+      }
       await repo.salvarPedido(atualizado);
     },
-    [repo, pedido],
+    [pedido, repo],
   );
 
   return { pedido, cliente, carregando, atualizar };

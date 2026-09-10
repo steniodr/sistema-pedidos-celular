@@ -1,3 +1,22 @@
+.linhaCabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.linhaCabecalhoInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.botaoEditar {
+  flex-shrink: 0;
+  width: var(--alvo-toque);
+  height: var(--alvo-toque);
+  padding: 0;
+  font-size: 1.1rem;
+}
+
 .acoesItem {
   display: flex;
   justify-content: flex-end;

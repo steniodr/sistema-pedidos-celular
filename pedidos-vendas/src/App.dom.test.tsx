@@ -643,6 +643,49 @@ describe("fluxo do pedido", () => {
     const salvoFinal = await dexieRepository.obterPedido(pedido.id);
     expect(salvoFinal?.numero).toBe(1);
   });
+
+  it("edita marca e troca de cliente pelo botão de edição no primeiro bloco da tela do pedido", async () => {
+    const clienteA = await dexieRepository.salvarCliente({
+      nome: "Cliente A",
+      cpfCnpj: "11222333000181",
+    });
+    const clienteB = await dexieRepository.salvarCliente({
+      nome: "Cliente B",
+      cpfCnpj: "52998224725",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: clienteA.id, marca: "MERKO" });
+
+    abrir(`/pedidos/${pedido.id}`);
+    await screen.findByText("Cliente A");
+    expect(screen.getByText("MERKO")).toBeDefined();
+    expect(screen.queryByLabelText(/^Marca/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Editar cliente ou marca" }));
+
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLInputElement;
+    expect(campoMarca.value).toBe("MERKO");
+    await userEvent.clear(campoMarca);
+    await userEvent.type(campoMarca, "ARARA AZUL");
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.marca).toBe("ARARA AZUL");
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Trocar cliente" }));
+    await screen.findByRole("heading", { name: "Escolher cliente" });
+    await userEvent.click(await screen.findByText("Cliente B"));
+
+    // Volta pra tela do pedido (remontada pela navegação de rota, por isso
+    // sai do modo edição) já com o cliente novo refletido, sem sobrar o
+    // clienteId na URL (a query string é limpa logo depois de aplicada).
+    await screen.findByRole("heading", { name: "Pedido nº " + pedido.numero });
+    await waitFor(() => expect(screen.getByText("Cliente B")).toBeDefined());
+    expect(screen.queryByText("Cliente A")).toBeNull();
+    expect(screen.getByText("ARARA AZUL")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Editar cliente ou marca" })).toBeDefined();
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.clienteId).toBe(clienteB.id);
+    });
+  });
 });
 
 describe("histórico", () => {

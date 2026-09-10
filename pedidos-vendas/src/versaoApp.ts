@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.9";
+export const VERSAO_APP = "1.10";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,13 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "1.10",
+    data: "2026-09-09",
+    itens: [
+      "Tela do pedido: botão de edição (✎) no bloco de cliente/marca — permite trocar a marca e o cliente vinculado a um pedido já criado, sem precisar excluir e começar de novo",
+    ],
+  },
   {
     versao: "1.9",
     data: "2026-08-18",

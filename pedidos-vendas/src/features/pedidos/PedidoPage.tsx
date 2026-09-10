@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { Button } from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/Confirm";
+import { Input } from "../../components/ui/Field";
 import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido, totalItem } from "../../domain/calculos";
@@ -13,11 +14,27 @@ import css from "./pedidos.module.css";
 export function PedidoPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const repo = useRepository();
   const toast = useToast();
   const confirmar = useConfirm();
   const { pedido, cliente, carregando, atualizar } = usePedido(id);
   const [excluindo, setExcluindo] = useState(false);
+  const [editandoCabecalho, setEditandoCabecalho] = useState(false);
+
+  // Volta de /clientes?selecionar=1&retorno=/pedidos/:id com ?clienteId= na
+  // URL — troca o cliente do pedido e limpa a query string.
+  const trocaClienteProcessada = useRef(false);
+  useEffect(() => {
+    if (trocaClienteProcessada.current) return;
+    const novoClienteId = params.get("clienteId");
+    if (!novoClienteId || !pedido) return;
+    trocaClienteProcessada.current = true;
+    navigate(`/pedidos/${pedido.id}`, { replace: true });
+    if (novoClienteId !== pedido.clienteId) {
+      void atualizar({ clienteId: novoClienteId });
+    }
+  }, [params, pedido, atualizar, navigate]);
 
   if (carregando) {
     return (
@@ -75,8 +92,47 @@ export function PedidoPage() {
   return (
     <Tela titulo={identificador} voltar="/" comBarraInferior>
       <Cartao>
-        <div className="texto-forte">{cliente?.nome ?? "Cliente removido"}</div>
-        <div className="texto-suave">{pedido.marca || "Sem marca"}</div>
+        {editandoCabecalho ? (
+          <>
+            <Input
+              rotulo="Marca"
+              placeholder="Ex.: MERKO, ARARA AZUL"
+              value={pedido.marca}
+              onChange={(e) => atualizar({ marca: e.target.value })}
+            />
+            <div className="texto-suave">{cliente?.nome ?? "Cliente removido"}</div>
+            <div className="linha linha--entre">
+              <Button
+                variante="secundario"
+                onClick={() =>
+                  navigate(
+                    `/clientes?selecionar=1&retorno=${encodeURIComponent(`/pedidos/${pedido.id}`)}`,
+                  )
+                }
+              >
+                Trocar cliente
+              </Button>
+              <Button variante="fantasma" onClick={() => setEditandoCabecalho(false)}>
+                Concluir
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className={css.linhaCabecalho}>
+            <div className={css.linhaCabecalhoInfo}>
+              <div className="texto-forte">{cliente?.nome ?? "Cliente removido"}</div>
+              <div className="texto-suave">{pedido.marca || "Sem marca"}</div>
+            </div>
+            <Button
+              variante="fantasma"
+              className={css.botaoEditar}
+              aria-label="Editar cliente ou marca"
+              onClick={() => setEditandoCabecalho(true)}
+            >
+              ✎
+            </Button>
+          </div>
+        )}
       </Cartao>
 
       <Button variante="perigo" onClick={excluirPedido} disabled={excluindo}>
