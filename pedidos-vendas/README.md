@@ -21,23 +21,28 @@ npm test                 # testes unitários e de tela
 
 ```
 src/
-  domain/      tipos, cálculos do pedido, CPF/CNPJ, listas fixas — regras puras, sem React
+  domain/      tipos, cálculos do pedido, CPF/CNPJ, listas fixas, agregações de relatório — regras puras, sem React
   db/          schema do Dexie (IndexedDB), com migração de versão
   data/        interface Repository + implementação Dexie + provider React
-  components/  kit de UI (botão, campo, select+outro, cartão, chips, sheet, toast, status)
+  components/  kit de UI: botão, campo, select+outro, chips, sheet, toast, confirm,
+               e o "redesenho" 2.0 — Tela com capa, Painel, LinhaLista, Etiqueta,
+               Esqueleto, Passos, ZonaDeRisco, Logo, ícones (redesenho.module.css)
   pwa.ts       registro do service worker, checagem periódica de atualização
   versaoApp.ts número da versão exibida na Home + changelog
   features/
     home/        tela inicial — atalhos, indicador de base, pedidos recentes
-    clientes/    lista, cadastro/edição, clientes de teste, importação em lote
+    bases/       hub "Cadastros": Clientes, Produtos e Marcas num lugar só
+    marcas/      cadastro de marcas (lista + form); a marca do pedido sai daqui
+    clientes/    lista, cadastro/edição, importação em lote
     produtos/    base de preços: listagem, edição/exclusão manual, importação
     pedidos/     novo pedido, itens, resumo, finalização e histórico
     checkin/     check-in de visita ao cliente (horário) e exportação por data
-    relatorios/  vendas por período (semana/mês/tudo), cliente e marca — visão
-                 por produto (categoria → produtos) ou por cliente, com
-                 gráfico de rosca e linha do tempo no detalhe
+    relatorios/  vendas por período (semana/mês/tudo, com navegação e soma de
+                 períodos), recorte Reais/Orçados/Teste, visão por produto
+                 (categoria → produtos), por cliente ou por marca, com gráfico
+                 de rosca e linha do tempo no detalhe; + o Relatório de teste
     export/      geração do .xlsx (molde real + gerador alternativo) e do .pdf
-    config/      dados do representante, atalho de importação
+    config/      representante, backup, Ambiente de teste, "Marcas nos relatórios"
 ```
 
 ### Pontos de extensão
@@ -51,6 +56,9 @@ src/
 | Detecção de coluna por planilha (compartilhada entre os dois importadores acima) | `src/domain/planilha.ts` |
 | Listas fixas (condição de pagamento, forma de solicitação) | `src/domain/condicoesPagamento.ts`, `src/domain/formasSolicitacao.ts` |
 | Métricas do relatório de vendas | `src/domain/relatorios.ts` — funções puras, sem I/O |
+| Recorte dos Relatórios (Reais/Orçados/Teste) e visibilidade de marca | filtro `enviados` em `src/features/relatorios/RelatoriosPage.tsx` |
+| Quais marcas contam nos números / grupos de marcas | `src/features/config/MarcasRelatorioPage.tsx` (`visivelEmRelatorios`, `listarGruposMarca`) |
+| Conjunto fictício do Relatório de teste | `src/features/relatorios/relatoriosTeste.ts` |
 | Lista simples do check-in (PDF/texto, agrupada por data) | `src/features/checkin/exportarCheckIns.ts` |
 | Número da versão e changelog exibidos na Tela Inicial | `src/versaoApp.ts` — atualizar à mão a cada release |
 | Sincronização futura (Supabase) | implementar `Repository` em `src/data/` e trocar no `RepositoryProvider` |
@@ -162,21 +170,36 @@ o registro não é mais o script injetado automaticamente pelo plugin.
 
 ## Estado atual
 
-Fases 1 e 2 da especificação original estão implementadas, mais uma rodada
-extensa de ajustes pedidos após uso real do app:
+Fases 1 e 2 da especificação original estão implementadas, mais várias rodadas
+de ajustes após uso real do app e, na **2.0**, um redesenho de todas as telas
+(capa com o número que importa em primeiro plano, campos em painéis, listas
+padronizadas, ícones e logo próprios):
+
+**Cadastros** — a Tela Inicial → **"Cadastros"** (`src/features/bases/`) reúne
+Clientes, Produtos e **Marcas** num hub só, cada linha com o total e a data da
+última importação.
 
 **Clientes** — cadastro com CPF/CNPJ **opcional** (útil pra cadastrar cliente
 ainda em fase de orçamento, com o documento capturado depois); quando
 preenchido, é validado por dígito verificador e bloqueia finalizar/exportar o
 pedido se for inválido — nunca bloqueia por estar vazio, nem impede salvar o
-rascunho do cadastro. Condição de pagamento como lista fixa (42 opções) com opção
-"Outro", lista com ícone de edição, busca com debounce, ordenação (Nome/Recentes),
-clientes de teste (Configurações, marcados e removíveis de uma vez, ver
-"Backup" abaixo), **importação em lote por planilha** (upsert
-por CPF/CNPJ, ver seção acima), tag de situação (Ativo/Inativo/Atenção) na lista
-quando vem da planilha, campos `nomeFantasia` e `contato` no cadastro. Excluir
-avisa quantos pedidos ficam sem o nome do cliente antes de confirmar, e oferece
-"Desfazer" logo depois.
+rascunho do cadastro. Endereço e contato ficam num painel que só abre quando
+precisa; **cidade e UF em campos separados** (gravados juntos em `cidadeEstado`,
+no mesmo formato da importação); sair do cadastro com alteração não salva pede
+confirmação. Condição de pagamento como lista fixa (42 opções) com opção
+"Outro", lista no formato de linha padrão (essencial à esquerda, ações no menu
+"⋯"), busca com debounce, ordenação (Nome/Recentes), **importação em lote por
+planilha** (upsert por CPF/CNPJ, ver seção acima), tag de situação
+(Ativo/Inativo/Atenção) na lista quando vem da planilha, campos `nomeFantasia`
+e `contato` no cadastro. Excluir avisa quantos pedidos ficam sem o nome do
+cliente antes de confirmar, e oferece "Desfazer" logo depois.
+
+**Marcas** — deixaram de ser texto livre: viram cadastro (`src/features/marcas/`),
+com lista e formulário. No pedido a marca é escolhida numa lista, com atalho
+"+ Cadastrar nova marca". Pedidos antigos (marca só em texto) são convertidos
+em cadastro automaticamente na primeira vez que a base de marcas é lida, sem
+perder nada. Cada marca tem `visivelEmRelatorios` (ver "Relatórios") e pode ser
+marcada como `teste`.
 
 **Produtos** — importação com prévia, formato matriz ou lista, base editável
 (criar/editar/excluir produto na mão, com "Desfazer", além da importação),
@@ -189,90 +212,122 @@ famílias Textura rústica/arranhado e Arenito (glitz, especial); quando um
 produto tem mais de uma variação, o vendedor escolhe qual ao montar o item, e
 o valor escolhido some ao nome no Excel/PDF exportado.
 
-**Pedido** — marca em texto livre e data do pedido (editável em Finalizar; o
-horário da visita não é mais gravado no pedido, ver "Check-in" abaixo), busca
-de produto só por nome (com escolha de variante/variação quando há mais de
-uma), embalagem em chips com opção "Outro", embalagem e valor obrigatórios,
-quantidade com botões −/+, desconto em % ou R$ com motivo opcional. Checkbox
-"Alterar nome final do produto" mostra um campo editável, pré-preenchido com o
-nome do produto, pra ajustar só o texto que sai no Excel/PDF — embalagem,
-preço e o nome na base de produtos continuam intactos. Um item
-pode ser marcado como "com desconto" (valor promocional avulso, com o campo
-Padrão/Complemento pré-preenchido "Valor promocional", já que esse campo
-aparece no Excel/PDF) — esse item fica de fora do cálculo do desconto geral
-do pedido. Em Finalizar: número do pedido editável (com aviso se já existe
-outro pedido com o mesmo número — bloqueia a exportação até corrigir), com
-checkbox **"Somente orçamento"** logo abaixo — dispensa o número (gera um
-código próprio, ex.: "ORC01", contador independente do número de pedido) e
-exclui o pedido dos totais de Relatórios, igual aos pedidos de teste, mas
-continua podendo ser exportado normalmente (Excel/PDF usam o código no lugar
-do número); ao desmarcar, volta a sugerir o próximo número de pedido
-disponível, que o vendedor pode ajustar. Forma
-de solicitação, condição de pagamento, transportadora e local de entrega
-como campos editáveis — os três últimos vêm pré-preenchidos do cadastro do
-cliente ao criar o pedido, com um botão "Usar do cliente" pra reaplicar se o
-cadastro mudar depois, mas editar aqui nunca altera o cadastro. Excluir
-pedido (com "Desfazer"), histórico com filtro por
-marca/cliente/status e por período (dia, semana ou mês, com calendário)
-agrupados num painel "Filtros" com contador de filtros ativos, busca com
-debounce, ordenação (Recentes/Maior valor), duplicar e reenviar pedido,
-botões "Salvar rascunho" e "Voltar ao início". Finalizar pedido tem os
-botões de exportar Excel/PDF fixos na parte de baixo da tela. Excluir
-cliente/produto/pedido, restaurar backup e o aviso de base de preços crítica
-usam um diálogo de confirmação no próprio visual do app (`useConfirm`,
-`src/components/ui/Confirm.tsx`), não mais o alerta nativo do navegador.
+**Pedido** — marca escolhida numa lista (ver "Marcas") e data do pedido
+(editável em Finalizar; o horário da visita não é mais gravado no pedido, ver
+"Check-in" abaixo), busca de produto só por nome (com escolha de
+variante/variação quando há mais de uma), embalagem em chips com opção "Outro",
+embalagem e valor obrigatórios, quantidade com botões −/+, desconto em % ou R$
+com motivo opcional. Checkbox "Alterar nome final do produto" mostra um campo
+editável, pré-preenchido com o nome do produto, pra ajustar só o texto que sai
+no Excel/PDF — embalagem, preço e o nome na base de produtos continuam intactos.
+Um item pode ser marcado como "com desconto" (valor promocional avulso, com o
+campo Padrão/Complemento pré-preenchido "Valor promocional", já que esse campo
+aparece no Excel/PDF) — esse item fica de fora do cálculo do desconto geral do
+pedido. Na tela do pedido, o bloco de cliente/marca tem um botão de edição (✎)
+pra trocar cliente ou marca de um pedido já criado, sem excluir e recomeçar.
+
+Em Finalizar: número do pedido editável (com aviso se já existe outro pedido
+com o mesmo número — bloqueia a **exportação de arquivo** até corrigir); forma
+de solicitação, condição de pagamento, transportadora e local de entrega como
+campos editáveis — os três últimos vêm pré-preenchidos do cadastro do cliente
+ao criar o pedido, com um link "Usar do cliente" pra reaplicar se o cadastro
+mudar depois, mas editar aqui nunca altera o cadastro. O botão **"Exportar"**
+abre uma folha com Excel (.xlsx), PDF e **"Salvar como orçamento e voltar"**.
+Essa última troca a folha por um card que mostra o próximo código de orçamento
+disponível (ex.: "ORC04", contador próprio, independente do número de pedido)
+pra conferir e confirmar; ao confirmar, o pedido vira orçamento
+(`somenteOrcamento`), fica com status **enviado** e volta pra Tela Inicial —
+aparecendo na hora no recorte "Orçados" dos Relatórios. Reabrindo um orçamento
+em Finalizar, o campo mostra "Código do orçamento" (só leitura) e um link
+**"Converter em pedido"** devolve um número (o próximo disponível, excluindo o
+próprio pedido do cálculo). "Salvar como orçamento" fica disponível mesmo com o
+número inválido/duplicado (ele descarta o número), mas continua bloqueado sem
+cliente ou sem itens.
+
+Excluir pedido (com "Desfazer"); histórico no formato de lista padrão, com
+capa que já traz busca e um resumo ("R$ no filtro" — que conta só venda de
+verdade, sem orçamento nem teste — e a contagem de pedidos), filtros
+(status/marca/cliente/período com calendário) numa folha com contador de
+filtros ativos, ordenação (Recentes/Maior valor), e Abrir/Duplicar/Reenviar no
+menu "⋯" de cada linha. Excluir cliente/produto/pedido, restaurar backup e o
+aviso de base de preços crítica usam um diálogo de confirmação no próprio
+visual do app (`useConfirm`, `src/components/ui/Confirm.tsx`), não o alerta
+nativo do navegador.
 
 **Check-in** — tela dedicada (`src/features/checkin/`) pra registrar a visita
 a um cliente, independente de existir pedido: escolhe o cliente (mesmo
 seletor usado em Novo pedido), data e horário com padrão o dia/hora atual,
-ambos editáveis (dá pra registrar uma visita retroativa). Lista com filtro
-por cliente e por período (dia/semana/mês, calendário),
-exportação à parte — lista simples (horário, cliente, código do cliente)
-agrupada por data, em PDF ou copiada como texto simples para a área de
-transferência (`src/features/checkin/exportarCheckIns.ts`) — substitui a
-exportação de "histórico de visita" que antes vivia dentro do Histórico de
-pedidos, já que o horário não depende mais de um pedido existir.
+ambos editáveis (dá pra registrar uma visita retroativa). Lista no formato de
+linha padrão, com filtro por cliente e por período (dia/semana/mês, calendário)
+e excluir no menu "⋯" da linha; exportação à parte — lista simples (horário,
+cliente, código do cliente) agrupada por data, em PDF ou copiada como texto
+simples para a área de transferência (`src/features/checkin/exportarCheckIns.ts`)
+— substitui a exportação de "histórico de visita" que antes vivia dentro do
+Histórico de pedidos, já que o horário não depende mais de um pedido existir.
 
 **Exportação** — Excel no molde oficial (com fallback e adaptação automática de
 capacidade, ver acima) e PDF com bloco de cliente e bloco de totais estilizados
 nas cores da marca, tabela de itens com listras zebradas (incluindo a coluna
 Padrão/Complemento, igual ao Excel).
 
-**Relatórios** — tela de vendas com filtro por período (semana atual, mês atual
-ou tudo), cliente e marca; cartões de total vendido, número de pedidos e
-ticket médio; alterna entre visão **"Por produto"** (agrupado por Categoria,
-com "Sem categoria" pra quem ainda não tem) e **"Por cliente"**. Gráfico de
-rosca (donut, SVG desenhado à mão — sem lib de gráfico) mostra a distribuição
-geral do nível atual, com legenda clicável (nome, valor, porcentagem);
-clicar numa categoria desce pra ver os produtos dela (drill-down de 2
-níveis), clicar num cliente ou num produto abre um gráfico de linha com a
-evolução das vendas daquele item ao longo do período (granularidade diária
-pra semana/mês, mensal pra "tudo" — ver `granularidadePara` em
-`src/domain/relatorios.ts`). Paleta de cores categórica validada
-(colorblind-safe) contra a superfície real do app. Só conta pedidos com
-status "Enviado" (rascunho não é venda fechada), nunca conta os pedidos de
-teste (ver "Backup" abaixo) e só reflete os pedidos deste aparelho, já que a
+**Relatórios** — capa com total vendido, número de pedidos e ticket médio do
+recorte atual. Três **recortes fechados** que nunca se misturam:
+**"Reais"** (venda fechada — sem teste, sem orçamento, sem marca oculta/de
+teste), **"Orçados"** (só pedidos "somente orçamento", que são cotação, não
+venda) e **"Teste"** (o Ambiente de teste). O seletor só mostra os recortes que
+fazem sentido (só aparece "Orçados" se há orçamento na base; "Teste" se há
+Ambiente de teste).
+
+Filtros: período por tipo (**Semana** ou **Mês**) com setas pra navegar entre
+períodos e a opção de somar mais de um mês/semana no mesmo relatório, ou
+**"Tudo"**; várias marcas de uma vez; **grupos de marcas**; cliente. As visões
+são **"Por produto"** (agrupado por Categoria, drill-down categoria → produtos),
+**"Por cliente"** e **"Por marca"**. Gráfico de rosca (donut, SVG desenhado à
+mão — sem lib de gráfico) mostra a distribuição do nível atual, com legenda
+clicável; clicar num item folha (produto, cliente ou marca) abre um gráfico de
+linha com a evolução ao longo do período (granularidade diária num único
+mês/semana, mensal quando são vários ou "Tudo" — ver `granularidadeParaSelecao`
+em `src/domain/relatorios.ts`). Paleta categórica validada (colorblind-safe)
+contra a superfície real do app.
+
+Conta só pedidos com status "Enviado", e no recorte "Reais" ignora ainda os
+pedidos de teste e as marcas com `visivelEmRelatorios: false` (que somem até de
+"Tudo"). O desconto do pedido é **rateado entre os itens** (`valoresLiquidosItens`
+em `src/domain/calculos.ts`), então a soma por produto/categoria bate com o
+"Total vendido" da capa. Só reflete os pedidos deste aparelho, já que a
 sincronização entre vendedores ainda não existe.
 
-**Backup** — Configurações tem botões para baixar toda a base local (clientes,
-produtos, pedidos, representante) em um `.json`, e restaurar a partir de um
-arquivo desses — útil pra trocar de aparelho antes da sincronização em nuvem
-existir. Configurações também tem um gerador de pedidos de teste (datas/marcas
-variadas, vinculados só aos clientes de teste) só pra validar a tela de
-Relatórios sem montar pedido na mão. Clientes e pedidos de teste ficam
-marcados (campo `teste` em `src/domain/types.ts`) — nunca entram nos totais
-de Relatórios e podem ser apagados de uma vez pelo botão "Remover dados de
-teste", sem afetar cadastros reais.
+**Configurações** — dados do representante; **backup** (baixar toda a base
+local — clientes, produtos, marcas, pedidos, representante — em um `.json` e
+restaurar a partir de um arquivo desses, útil pra trocar de aparelho antes da
+sincronização em nuvem existir); **"Marcas nos relatórios"**
+(`MarcasRelatorioPage`) — liga/desliga quais marcas entram nos números e monta
+os grupos de marcas usados no filtro de Relatórios; e o **"Ambiente de teste"**
+(`AmbienteTestePage`) — um lugar só pros dados fictícios: gera clientes de
+teste e um conjunto de pedidos espalhados por várias semanas e meses em 3
+marcas de teste, com atalho pro "Relatório de teste". Clientes, pedidos e
+marcas de teste ficam marcados (campo `teste` em `src/domain/types.ts`) — nunca
+entram nos números reais (nem em "Tudo") e podem ser apagados de uma vez, sem
+afetar cadastros reais.
 
-**App / atualização** — rodapé da Tela Inicial mostra a versão (`v1.9`) com um
-ícone (ⓘ) que abre o changelog; ver seção "Atualização do service worker" acima
-sobre como o app garante que a versão instalada não fique presa numa build
-antiga.
+**App / atualização** — rodapé da Tela Inicial mostra a versão (`v2.0`) com um
+ícone que abre o changelog (`src/versaoApp.ts`); ver seção "Atualização do
+service worker" acima. Além disso: os pedaços carregados sob demanda (exceljs,
+jspdf, xlsx) pertencem à build que abriu a aba — se o app foi atualizado no
+meio do caminho, o navegador não acha mais o arquivo e o que parecia "erro de
+exportação" agora vira um aviso **"Recarregar"** (ouve `vite:preloadError` em
+`src/App.tsx` e o erro de MIME em `src/domain/erros.ts`).
 
-**Visual** — gradiente da marca na Tela Inicial, status do pedido colorido
-(Rascunho em amarelo, Enviado em verde).
+**Visual (2.0)** — redesenho de todas as telas: cada uma abre com uma **capa**
+que já traz o número/estado que importa, os campos ficam agrupados em
+**painéis** (`Painel`, colapsáveis com resumo), as listas seguem um formato
+único (`LinhaLista` — essencial à esquerda, valor à direita, ações no menu
+"⋯"), com **esqueletos** de carregamento, ícones e logo/tipografia próprios
+(`src/components/ui/redesenho.module.css`). Status do pedido colorido: Rascunho
+em amarelo, Enviado em verde e **Orçado** no mesmo tom do rascunho — "Enviado"
+verde passava ideia de venda fechada, o que um orçamento não é.
 
-194 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
+267 testes automatizados (`npm test`), incluindo testes contra os arquivos reais
 dos moldes Excel (`excel.modelo.test.ts`) e da base de clientes real.
 
 Fase 3 (sincronização com Supabase) ainda não foi iniciada — é o próximo passo

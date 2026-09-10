@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import { Input, Textarea } from "../../components/ui/Field";
 import { BarraInferior, Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { IconeMarca as IconeEtiquetaPreco, IconeProduto } from "../../components/ui/icones";
 import { formatarMoeda, lerNumeroBR, totaisPedido, totalItem } from "../../domain/calculos";
 import type { DescontoTipo } from "../../domain/types";
 import { usePedido } from "./usePedido";
@@ -43,8 +45,20 @@ export function ResumoPedidoPage() {
   const totais = totaisPedido(pedido);
 
   return (
-    <Tela titulo="Resumo do pedido" voltar={`/pedidos/${pedido.id}`} comBarraInferior>
-      <Cartao>
+    <Tela
+      titulo="Resumo do pedido"
+      subtitulo={
+        pedido.somenteOrcamento
+          ? `Orçamento ${pedido.codigoOrcamento}`
+          : `Pedido nº ${pedido.numero} · ${pedido.itens.length} ${
+              pedido.itens.length === 1 ? "item" : "itens"
+            }`
+      }
+      voltar={`/pedidos/${pedido.id}`}
+      capa
+      comBarraInferior
+    >
+      <Painel titulo={`Itens (${pedido.itens.length})`} icone={<IconeProduto size={17} />}>
         <div className="pilha pilha--apertada">
           {pedido.itens.map((item) => (
             <div key={item.item} className="linha linha--entre">
@@ -60,9 +74,9 @@ export function ResumoPedidoPage() {
             </div>
           ))}
         </div>
-      </Cartao>
+      </Painel>
 
-      <h2 className="secao-titulo">Desconto</h2>
+      <Painel titulo="Desconto" icone={<IconeEtiquetaPreco size={17} />}>
       <div className={css.descontoEntrada}>
         <Chips
           opcoes={["%", "R$"] as const}
@@ -111,6 +125,7 @@ export function ResumoPedidoPage() {
           ajuda="Quem autorizou e/ou o motivo do desconto."
         />
       )}
+      </Painel>
 
       <Cartao>
         <div className={css.linhaTotais}>

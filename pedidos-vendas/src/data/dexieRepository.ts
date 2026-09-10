@@ -2,7 +2,9 @@ import { agora, db, novoId } from "../db/schema";
 import type {
   CheckIn,
   Cliente,
+  GrupoMarca,
   ImportacaoInfo,
+  Marca,
   Pedido,
   Produto,
   Representante,
@@ -13,6 +15,8 @@ import type {
   BackupDados,
   EntradaCheckIn,
   EntradaCliente,
+  EntradaGrupoMarca,
+  EntradaMarca,
   EntradaProduto,
   EntradaProdutoUnico,
   FiltroCheckIns,
@@ -25,6 +29,7 @@ import type {
 
 const CHAVE_IMPORTACAO = "ultimaImportacao";
 const CHAVE_REPRESENTANTE = "representante";
+const CHAVE_GRUPOS_MARCA = "gruposMarca";
 
 /** Campos de texto não vazios da entrada — usado para mesclar sem apagar dados existentes. */
 function camposPreenchidos(entrada: EntradaCliente): Partial<Cliente> {
@@ -277,7 +282,7 @@ export const dexieRepository: Repository = {
     return `ORC${String(maior + 1).padStart(2, "0")}`;
   },
 
-  async criarPedido({ clienteId, marca }: NovoPedido) {
+  async criarPedido({ clienteId, marca, marcaId }: NovoPedido) {
     const [representante, cliente] = await Promise.all([
       this.obterRepresentante(),
       db.clientes.get(clienteId),
@@ -287,6 +292,7 @@ export const dexieRepository: Repository = {
       id: novoId(),
       numero: await this.proximoNumeroPedido(),
       marca,
+      marcaId,
       clienteId,
       dataPedido: momento.slice(0, 10),
       representanteNome: representante?.nome,
@@ -329,6 +335,77 @@ export const dexieRepository: Repository = {
     };
     await db.pedidos.add(copia);
     return copia;
+  },
+
+  async listarMarcas(opts) {
+    const todas = await db.marcas.orderBy("nome").toArray();
+    return opts?.incluirTeste ? todas : todas.filter((m) => !m.teste);
+  },
+
+  async obterMarca(id) {
+    return db.marcas.get(id);
+  },
+
+  async salvarMarca(entrada: EntradaMarca) {
+    const existentePorId = entrada.id ? await db.marcas.get(entrada.id) : undefined;
+    // Sem id (marca nova): se já existe uma com o mesmo nome normalizado,
+    // atualiza aquela em vez de criar uma duplicada.
+    const alvoNome = normalizar(entrada.nome);
+    const existente =
+      existentePorId ??
+      (await db.marcas.toArray()).find((m) => normalizar(m.nome) === alvoNome);
+    const marca: Marca = {
+      ...entrada,
+      id: existente?.id ?? entrada.id ?? novoId(),
+      nome: entrada.nome.trim(),
+      criadoEm: existente?.criadoEm ?? agora(),
+      atualizadoEm: agora(),
+    };
+    await db.marcas.put(marca);
+    return marca;
+  },
+
+  async removerMarca(id) {
+    await db.marcas.delete(id);
+  },
+
+  async contarPedidosPorMarca() {
+    const [pedidos, marcas] = await Promise.all([
+      db.pedidos.toArray(),
+      db.marcas.toArray(),
+    ]);
+    const idPorNome = new Map(marcas.map((m) => [normalizar(m.nome), m.id]));
+    const contagem = new Map<string, number>();
+    for (const pedido of pedidos) {
+      const id = pedido.marcaId ?? idPorNome.get(normalizar(pedido.marca ?? ""));
+      if (!id) continue;
+      contagem.set(id, (contagem.get(id) ?? 0) + 1);
+    }
+    return contagem;
+  },
+
+  async listarGruposMarca() {
+    const registro = await db.meta.get(CHAVE_GRUPOS_MARCA);
+    return (registro?.valor as GrupoMarca[] | undefined) ?? [];
+  },
+
+  async salvarGrupoMarca(entrada: EntradaGrupoMarca) {
+    const grupos = await this.listarGruposMarca();
+    const grupo: GrupoMarca = {
+      id: entrada.id ?? novoId(),
+      nome: entrada.nome.trim(),
+      marcaIds: [...entrada.marcaIds],
+    };
+    const indice = grupos.findIndex((g) => g.id === grupo.id);
+    if (indice >= 0) grupos[indice] = grupo;
+    else grupos.push(grupo);
+    await db.meta.put({ chave: CHAVE_GRUPOS_MARCA, valor: grupos });
+    return grupo;
+  },
+
+  async removerGrupoMarca(id) {
+    const grupos = (await this.listarGruposMarca()).filter((g) => g.id !== id);
+    await db.meta.put({ chave: CHAVE_GRUPOS_MARCA, valor: grupos });
   },
 
   async listarCheckIns(filtro: FiltroCheckIns = {}) {
@@ -378,15 +455,25 @@ export const dexieRepository: Repository = {
   },
 
   async exportarBackup() {
-    const [clientes, produtos, pedidos, checkIns, representante, ultimaImportacao] =
-      await Promise.all([
-        db.clientes.toArray(),
-        db.produtos.toArray(),
-        db.pedidos.toArray(),
-        db.checkIns.toArray(),
-        this.obterRepresentante(),
-        this.obterUltimaImportacao(),
-      ]);
+    const [
+      clientes,
+      produtos,
+      pedidos,
+      checkIns,
+      marcas,
+      gruposMarca,
+      representante,
+      ultimaImportacao,
+    ] = await Promise.all([
+      db.clientes.toArray(),
+      db.produtos.toArray(),
+      db.pedidos.toArray(),
+      db.checkIns.toArray(),
+      db.marcas.toArray(),
+      this.listarGruposMarca(),
+      this.obterRepresentante(),
+      this.obterUltimaImportacao(),
+    ]);
     const backup: BackupDados = {
       versao: 1,
       geradoEm: agora(),
@@ -394,6 +481,8 @@ export const dexieRepository: Repository = {
       produtos,
       pedidos,
       checkIns,
+      marcas,
+      gruposMarca,
       representante,
       ultimaImportacao,
     };
@@ -403,11 +492,7 @@ export const dexieRepository: Repository = {
   async restaurarBackup(dados: BackupDados) {
     await db.transaction(
       "rw",
-      db.clientes,
-      db.produtos,
-      db.pedidos,
-      db.checkIns,
-      db.meta,
+      [db.clientes, db.produtos, db.pedidos, db.checkIns, db.marcas, db.meta],
       async () => {
         await db.clientes.clear();
         await db.clientes.bulkPut(dados.clientes);
@@ -417,6 +502,9 @@ export const dexieRepository: Repository = {
         await db.pedidos.bulkPut(dados.pedidos);
         await db.checkIns.clear();
         if (dados.checkIns) await db.checkIns.bulkPut(dados.checkIns);
+        await db.marcas.clear();
+        if (dados.marcas) await db.marcas.bulkPut(dados.marcas);
+        await db.meta.put({ chave: CHAVE_GRUPOS_MARCA, valor: dados.gruposMarca ?? [] });
         if (dados.representante) {
           await db.meta.put({ chave: CHAVE_REPRESENTANTE, valor: dados.representante });
         }
@@ -428,14 +516,17 @@ export const dexieRepository: Repository = {
   },
 
   async removerDadosTeste() {
-    const resultado: RemocaoDadosTeste = { clientes: 0, pedidos: 0 };
-    await db.transaction("rw", db.clientes, db.pedidos, async () => {
+    const resultado: RemocaoDadosTeste = { clientes: 0, pedidos: 0, marcas: 0 };
+    await db.transaction("rw", db.clientes, db.pedidos, db.marcas, async () => {
       const clientesTeste = await db.clientes.filter((c) => c.teste === true).primaryKeys();
       const pedidosTeste = await db.pedidos.filter((p) => p.teste === true).primaryKeys();
+      const marcasTeste = await db.marcas.filter((m) => m.teste === true).primaryKeys();
       await db.clientes.bulkDelete(clientesTeste);
       await db.pedidos.bulkDelete(pedidosTeste);
+      await db.marcas.bulkDelete(marcasTeste);
       resultado.clientes = clientesTeste.length;
       resultado.pedidos = pedidosTeste.length;
+      resultado.marcas = marcasTeste.length;
     });
     return resultado;
   },

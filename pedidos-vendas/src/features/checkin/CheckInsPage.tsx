@@ -5,8 +5,27 @@ import { useDados } from "../../hooks/useDados";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Button } from "../../components/ui/Button";
 import { CalendarioMes } from "../../components/ui/CalendarioMes";
-import { Input, Select } from "../../components/ui/Field";
-import { BarraInferior, Cartao, Chips, EstadoVazio, Sheet, Tela } from "../../components/ui/Layout";
+import { Select } from "../../components/ui/Field";
+import {
+  BarraInferior,
+  BotaoCapa,
+  Chips,
+  EstadoVazio,
+  Sheet,
+  Tela,
+} from "../../components/ui/Layout";
+import { LinhaLista } from "../../components/ui/LinhaLista";
+import { Esqueleto } from "../../components/ui/Esqueleto";
+import {
+  IconeBuscar,
+  IconeCalendario,
+  IconeCheckin,
+  IconeExportar,
+  IconeFechar,
+  IconeFiltros,
+  IconeMaisAcoes,
+} from "../../components/ui/icones";
+import capaCss from "../../components/ui/redesenho.module.css";
 import { useConfirm } from "../../components/ui/Confirm";
 import { useToast } from "../../components/ui/Toast";
 import { mensagemErro } from "../../domain/erros";
@@ -47,6 +66,7 @@ export function CheckInsPage() {
   const [sheetExportarAberto, setSheetExportarAberto] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [copiando, setCopiando] = useState(false);
+  const [menuCheckInId, setMenuCheckInId] = useState<string | null>(null);
 
   const { dados: contexto } = useDados(async () => {
     const [todos, clientes] = await Promise.all([repo.listarCheckIns(), repo.listarClientes()]);
@@ -164,50 +184,129 @@ export function CheckInsPage() {
     }
   }
 
-  const filtrosAtivos = [clienteFiltro !== TODOS_CLIENTES, filtroPeriodo !== null].filter(
-    Boolean,
-  ).length;
+  /** Etiquetas removíveis do que está filtrado — antes só havia um número num badge. */
+  const chipsFiltro: { chave: string; rotulo: string; limpar: () => void }[] = [];
+  if (clienteFiltro !== TODOS_CLIENTES) {
+    chipsFiltro.push({
+      chave: "cliente",
+      rotulo:
+        contexto?.clientesComCheckIn.find((c) => c.id === clienteFiltro)?.nome ?? "Cliente",
+      limpar: () => setClienteFiltro(TODOS_CLIENTES),
+    });
+  }
+  if (filtroPeriodo) {
+    chipsFiltro.push({
+      chave: "periodo",
+      rotulo: rotuloFiltroPeriodo(filtroPeriodo),
+      limpar: () => setFiltroPeriodo(null),
+    });
+  }
+
+  /** Quantos clientes distintos aparecem no filtro atual — vira o 2o número da capa. */
+  const clientesVisitados = new Set((checkIns ?? []).map((c) => c.clienteId)).size;
+
+  const checkInDoMenu = checkIns?.find((c) => c.id === menuCheckInId);
+  const nomeDoCliente = (clienteId: string) =>
+    contexto?.clientesPorId.get(clienteId)?.nome ?? "Cliente removido";
 
   return (
-    <Tela titulo="Check-in" voltar="/" comBarraInferior>
-      <Input
-        rotulo="Buscar"
-        placeholder="Nome do cliente"
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        autoComplete="off"
-      />
+    <Tela
+      titulo="Check-in"
+      voltar="/"
+      capa
+      comBarraInferior
+      acao={
+        <BotaoCapa rotulo="Filtros" onClick={() => setSheetFiltrosAberto(true)}>
+          <IconeFiltros size={19} />
+        </BotaoCapa>
+      }
+      abaixoDoTitulo={
+        <>
+          <div className={capaCss.capaBusca}>
+            <span className={capaCss.capaBuscaIcone}>
+              <IconeBuscar size={16} />
+            </span>
+            <input
+              className={capaCss.capaBuscaCampo}
+              placeholder="Nome do cliente"
+              aria-label="Buscar"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <div className={capaCss.capaResumo}>
+            <div className={capaCss.capaResumoItem}>
+              <div className={capaCss.capaResumoValor}>{checkIns?.length ?? 0}</div>
+              <div className={capaCss.capaResumoRotulo}>
+                {checkIns?.length === 1 ? "visita" : "visitas"}
+              </div>
+            </div>
+            <div className={capaCss.capaResumoItem}>
+              <div className={capaCss.capaResumoValor}>{clientesVisitados}</div>
+              <div className={capaCss.capaResumoRotulo}>
+                {clientesVisitados === 1 ? "cliente" : "clientes"}
+              </div>
+            </div>
+          </div>
+        </>
+      }
+    >
+      {chipsFiltro.length > 0 && (
+        <div className={css.filtrosAtivos}>
+          {chipsFiltro.map((c) => (
+            <button key={c.chave} type="button" className={css.chipToken} onClick={c.limpar}>
+              {c.rotulo}
+              <IconeFechar size={13} />
+            </button>
+          ))}
+          <button type="button" className={css.linkLimpar} onClick={limparFiltros}>
+            Limpar
+          </button>
+        </div>
+      )}
 
-      <Button variante="secundario" bloco onClick={() => setSheetFiltrosAberto(true)}>
-        Filtros
-        {filtrosAtivos > 0 && <span className={css.badgeFiltros}>{filtrosAtivos}</span>}
-      </Button>
-
-      {checkIns?.length === 0 ? (
+      {!checkIns ? (
+        <Esqueleto linhas={4} />
+      ) : checkIns.length === 0 ? (
         <EstadoVazio
           titulo="Nenhum check-in neste filtro"
-          descricao="Toque em “Novo check-in” para começar."
+          descricao={
+            chipsFiltro.length > 0
+              ? "Tente limpar os filtros para ver mais visitas."
+              : "Toque em “Novo check-in” para registrar uma visita."
+          }
+          acao={
+            chipsFiltro.length > 0 ? (
+              <Button variante="secundario" onClick={limparFiltros}>
+                Limpar filtros
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="pilha">
-          {checkIns?.map((checkIn) => (
-            <Cartao key={checkIn.id}>
-              <div className="linha linha--entre">
-                <span className="texto-forte">
-                  {contexto?.clientesPorId.get(checkIn.clienteId)?.nome ?? "Cliente removido"}
-                </span>
-                <span className="texto-forte">{checkIn.hora}</span>
-              </div>
-              <div className="texto-suave">{formatarData(checkIn.data)}</div>
-              <div className={css.acoesItem}>
-                <Button variante="fantasma" onClick={() => navigate(`/checkins/${checkIn.id}`)}>
-                  Editar
+          {checkIns.map((checkIn) => (
+            // A linha inteira abre a edição; Excluir saiu de baixo do cartão
+            // (onde ficava colado no "Editar") para o menu "...".
+            <LinhaLista
+              key={checkIn.id}
+              icone={<IconeCheckin size={17} />}
+              titulo={nomeDoCliente(checkIn.clienteId)}
+              meta={formatarData(checkIn.data)}
+              valor={checkIn.hora}
+              onClick={() => navigate(`/checkins/${checkIn.id}`)}
+              acaoFim={
+                <Button
+                  variante="fantasma"
+                  className={css.botaoLinhaAcao}
+                  aria-label={`Ações do check-in de ${nomeDoCliente(checkIn.clienteId)}`}
+                  onClick={() => setMenuCheckInId(checkIn.id)}
+                >
+                  <IconeMaisAcoes size={18} />
                 </Button>
-                <Button variante="perigo" onClick={() => excluir(checkIn.id)}>
-                  Excluir
-                </Button>
-              </div>
-            </Cartao>
+              }
+            />
           ))}
         </div>
       )}
@@ -215,6 +314,7 @@ export function CheckInsPage() {
       <BarraInferior>
         <div className={css.botoesRodape}>
           <Button variante="secundario" bloco onClick={() => setSheetExportarAberto(true)} disabled={!checkIns}>
+            <IconeExportar size={17} />
             Exportar
           </Button>
           <Button bloco onClick={() => navigate("/checkins/novo")}>
@@ -222,6 +322,35 @@ export function CheckInsPage() {
           </Button>
         </div>
       </BarraInferior>
+
+      <Sheet
+        titulo={checkInDoMenu ? nomeDoCliente(checkInDoMenu.clienteId) : "Ações"}
+        aberto={!!checkInDoMenu}
+        aoFechar={() => setMenuCheckInId(null)}
+      >
+        <Button
+          variante="secundario"
+          bloco
+          onClick={() => {
+            const alvo = checkInDoMenu;
+            setMenuCheckInId(null);
+            if (alvo) navigate(`/checkins/${alvo.id}`);
+          }}
+        >
+          Editar
+        </Button>
+        <Button
+          variante="perigo"
+          bloco
+          onClick={() => {
+            const alvo = checkInDoMenu;
+            setMenuCheckInId(null);
+            if (alvo) void excluir(alvo.id);
+          }}
+        >
+          Excluir
+        </Button>
+      </Sheet>
 
       <Sheet titulo="Filtros" aberto={sheetFiltrosAberto} aoFechar={() => setSheetFiltrosAberto(false)}>
         {contexto && contexto.clientesComCheckIn.length > 1 && (
@@ -240,10 +369,11 @@ export function CheckInsPage() {
         )}
 
         <Button variante="secundario" bloco onClick={abrirSheetPeriodo}>
+          <IconeCalendario size={17} />
           {filtroPeriodo ? rotuloFiltroPeriodo(filtroPeriodo) : "Filtrar por período"}
         </Button>
 
-        {filtrosAtivos > 0 && (
+        {chipsFiltro.length > 0 && (
           <Button variante="fantasma" bloco onClick={limparFiltros}>
             Limpar filtros
           </Button>

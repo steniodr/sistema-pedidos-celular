@@ -5,8 +5,13 @@ import { useDados } from "../../hooks/useDados";
 import { useDebounce } from "../../hooks/useDebounce";
 import { Button } from "../../components/ui/Button";
 import { CalendarioMes } from "../../components/ui/CalendarioMes";
-import { Input, Select } from "../../components/ui/Field";
-import { Cartao, Chips, EstadoVazio, Sheet, Tela } from "../../components/ui/Layout";
+import { Select } from "../../components/ui/Field";
+import { BotaoCapa, Chips, EstadoVazio, Sheet, Tela } from "../../components/ui/Layout";
+import { LinhaLista } from "../../components/ui/LinhaLista";
+import { Etiqueta } from "../../components/ui/Etiqueta";
+import { Esqueleto } from "../../components/ui/Esqueleto";
+import { IconeBuscar, IconeFechar, IconeFiltros, IconeMaisAcoes } from "../../components/ui/icones";
+import capaCss from "../../components/ui/redesenho.module.css";
 import { StatusPedido as StatusPedidoTag } from "../../components/ui/StatusPedido";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido } from "../../domain/calculos";
@@ -57,6 +62,7 @@ export function HistoricoPage() {
   const [mesCalendario, setMesCalendario] = useState(() => new Date());
   const [ordem, setOrdem] = useState<Ordem>("Recentes");
   const [busca, setBusca] = useState("");
+  const [menuPedidoId, setMenuPedidoId] = useState<string | null>(null);
   const buscaDebounced = useDebounce(busca);
 
   const { dados: contexto } = useDados(async () => {
@@ -135,79 +141,216 @@ export function HistoricoPage() {
     filtroPeriodo !== null,
   ].filter(Boolean).length;
 
+  // Orçamento é cotação, não venda fechada — fica de fora do total do topo
+  // (continua na lista, com etiqueta). O mesmo vale pro pedido de teste.
+  const contaNoTotal = (p: { somenteOrcamento?: boolean; teste?: boolean }) =>
+    !p.somenteOrcamento && !p.teste;
+  const totalFiltrado = (pedidos ?? [])
+    .filter(contaNoTotal)
+    .reduce((soma, p) => soma + totaisPedido(p).total, 0);
+
+  /** Etiquetas removiveis do que esta filtrado — antes so havia um numero num badge. */
+  const chipsFiltro: { chave: string; rotulo: string; limpar: () => void }[] = [];
+  if (filtro !== "Todos") {
+    chipsFiltro.push({ chave: "status", rotulo: filtro, limpar: () => setFiltro("Todos") });
+  }
+  if (marcaFiltro !== TODAS_MARCAS) {
+    chipsFiltro.push({
+      chave: "marca",
+      rotulo: marcaFiltro,
+      limpar: () => setMarcaFiltro(TODAS_MARCAS),
+    });
+  }
+  if (clienteFiltro !== TODOS_CLIENTES) {
+    chipsFiltro.push({
+      chave: "cliente",
+      rotulo:
+        contexto?.clientesComPedido.find((c) => c.id === clienteFiltro)?.nome ?? "Cliente",
+      limpar: () => setClienteFiltro(TODOS_CLIENTES),
+    });
+  }
+  if (filtroPeriodo) {
+    chipsFiltro.push({
+      chave: "periodo",
+      rotulo: rotuloFiltroPeriodo(filtroPeriodo),
+      limpar: () => setFiltroPeriodo(null),
+    });
+  }
+
+  const pedidoDoMenu = pedidos?.find((p) => p.id === menuPedidoId);
+
+  function identificadorDe(p: { somenteOrcamento?: boolean; codigoOrcamento?: string; numero: number }) {
+    return p.somenteOrcamento ? `Orçamento ${p.codigoOrcamento}` : `nº ${p.numero}`;
+  }
+
   return (
-    <Tela titulo="Histórico" voltar="/">
-      <Input
-        rotulo="Buscar"
-        placeholder="Número do pedido, marca ou cliente"
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        autoComplete="off"
-      />
+    <Tela
+      titulo="Histórico"
+      voltar="/"
+      capa
+      acao={
+        <BotaoCapa rotulo="Filtros" onClick={() => setSheetFiltrosAberto(true)}>
+          <IconeFiltros size={19} />
+        </BotaoCapa>
+      }
+      abaixoDoTitulo={
+        <>
+          <div className={capaCss.capaBusca}>
+            <span className={capaCss.capaBuscaIcone}>
+              <IconeBuscar size={16} />
+            </span>
+            <input
+              className={capaCss.capaBuscaCampo}
+              placeholder="Número, marca ou cliente"
+              aria-label="Buscar"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <div className={capaCss.capaResumo}>
+            <div className={capaCss.capaResumoItem}>
+              <div className={capaCss.capaResumoValor}>{formatarMoeda(totalFiltrado)}</div>
+              <div className={capaCss.capaResumoRotulo}>no filtro</div>
+            </div>
+            <div className={capaCss.capaResumoItem}>
+              <div className={capaCss.capaResumoValor}>{pedidos?.length ?? 0}</div>
+              <div className={capaCss.capaResumoRotulo}>
+                {pedidos?.length === 1 ? "pedido" : "pedidos"}
+              </div>
+            </div>
+          </div>
+        </>
+      }
+    >
+      {chipsFiltro.length > 0 && (
+        <div className={css.filtrosAtivos}>
+          {chipsFiltro.map((c) => (
+            <button key={c.chave} type="button" className={css.chipToken} onClick={c.limpar}>
+              {c.rotulo}
+              <IconeFechar size={13} />
+            </button>
+          ))}
+          <button type="button" className={css.linkLimpar} onClick={limparFiltros}>
+            Limpar
+          </button>
+        </div>
+      )}
 
-      <Button
-        variante="secundario"
-        bloco
-        className={css.botaoFiltros}
-        onClick={() => setSheetFiltrosAberto(true)}
-      >
-        Filtros
-        {filtrosAtivos > 0 && <span className={css.badgeFiltros}>{filtrosAtivos}</span>}
-      </Button>
-
-      {pedidos?.length === 0 ? (
-        <EstadoVazio titulo="Nenhum pedido neste filtro" />
+      {!pedidos ? (
+        <Esqueleto linhas={4} />
+      ) : pedidos.length === 0 ? (
+        <EstadoVazio
+          titulo="Nenhum pedido neste filtro"
+          descricao={
+            chipsFiltro.length > 0
+              ? "Tente limpar os filtros para ver mais pedidos."
+              : "Os pedidos que você criar aparecem aqui."
+          }
+          acao={
+            chipsFiltro.length > 0 ? (
+              <Button variante="secundario" onClick={limparFiltros}>
+                Limpar filtros
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="pilha">
-          {pedidos?.map((pedido) => {
+          {pedidos.map((pedido) => {
             const { total } = totaisPedido(pedido);
             return (
-              <Cartao key={pedido.id}>
-                <div className="linha linha--entre">
-                  <span className="texto-forte">
-                    {pedido.somenteOrcamento ? `Orçamento ${pedido.codigoOrcamento}` : `Pedido nº ${pedido.numero}`}
-                  </span>
-                  <span className="texto-forte">{formatarMoeda(total)}</span>
-                </div>
-                <div className="texto-suave">
-                  {contexto?.clientesPorId.get(pedido.clienteId)?.nome ?? "Cliente removido"} ·{" "}
-                  {pedido.marca || "Sem marca"} · {formatarData(pedido.dataPedido)} ·{" "}
-                  <StatusPedidoTag status={pedido.status} />
-                  {pedido.teste && <span className={css.tagTeste}>Teste</span>}
-                  {pedido.somenteOrcamento && <span className={css.tagTeste}>Orçamento</span>}
-                </div>
-                <div className={css.acoesItem}>
-                  <Button variante="fantasma" onClick={() => duplicar(pedido.id)}>
-                    Duplicar
-                  </Button>
+              <LinhaLista
+                key={pedido.id}
+                acento={pedido.status === "enviado" ? "sucesso" : "alerta"}
+                titulo={
+                  <>
+                    {contexto?.clientesPorId.get(pedido.clienteId)?.nome ?? "Cliente removido"}
+                    {pedido.teste && <Etiqueta>Teste</Etiqueta>}
+                    {pedido.somenteOrcamento && <Etiqueta variante="info">Orçamento</Etiqueta>}
+                  </>
+                }
+                meta={
+                  <>
+                    {identificadorDe(pedido)} · {pedido.marca || "Sem marca"} ·{" "}
+                    {formatarData(pedido.dataPedido)}
+                    <StatusPedidoTag
+                      status={pedido.status}
+                      somenteOrcamento={pedido.somenteOrcamento}
+                    />
+                  </>
+                }
+                valor={formatarMoeda(total)}
+                onClick={() => navigate(`/pedidos/${pedido.id}`)}
+                acaoFim={
                   <Button
                     variante="fantasma"
-                    onClick={() => navigate(`/pedidos/${pedido.id}/finalizar`)}
+                    className={css.botaoLinhaAcao}
+                    aria-label={`Ações do pedido ${identificadorDe(pedido)}`}
+                    onClick={() => setMenuPedidoId(pedido.id)}
                   >
-                    Reenviar
+                    <IconeMaisAcoes size={18} />
                   </Button>
-                  <Button
-                    variante="secundario"
-                    onClick={() => navigate(`/pedidos/${pedido.id}`)}
-                  >
-                    Abrir
-                  </Button>
-                </div>
-              </Cartao>
+                }
+              />
             );
           })}
         </div>
       )}
 
       <Sheet
+        titulo={pedidoDoMenu ? `Pedido ${identificadorDe(pedidoDoMenu)}` : "Ações"}
+        aberto={!!pedidoDoMenu}
+        aoFechar={() => setMenuPedidoId(null)}
+      >
+        <Button
+          variante="secundario"
+          bloco
+          onClick={() => {
+            const alvo = pedidoDoMenu;
+            setMenuPedidoId(null);
+            if (alvo) navigate(`/pedidos/${alvo.id}`);
+          }}
+        >
+          Abrir
+        </Button>
+        <Button
+          variante="secundario"
+          bloco
+          onClick={() => {
+            const alvo = pedidoDoMenu;
+            setMenuPedidoId(null);
+            if (alvo) void duplicar(alvo.id);
+          }}
+        >
+          Duplicar
+        </Button>
+        <Button
+          variante="secundario"
+          bloco
+          onClick={() => {
+            const alvo = pedidoDoMenu;
+            setMenuPedidoId(null);
+            if (alvo) navigate(`/pedidos/${alvo.id}/finalizar`);
+          }}
+        >
+          Reenviar
+        </Button>
+      </Sheet>
+
+      <Sheet
         titulo="Filtros"
         aberto={sheetFiltrosAberto}
         aoFechar={() => setSheetFiltrosAberto(false)}
       >
+        <span className="secao-titulo">Situação</span>
         <Chips opcoes={FILTROS} valor={filtro} onChange={setFiltro} />
 
         {opcoesMarca.length > 1 && (
-          <Chips opcoes={opcoesMarca} valor={marcaFiltro} onChange={setMarcaFiltro} />
+          <>
+            <span className="secao-titulo">Marca</span>
+            <Chips opcoes={opcoesMarca} valor={marcaFiltro} onChange={setMarcaFiltro} />
+          </>
         )}
 
         {contexto && contexto.clientesComPedido.length > 1 && (
@@ -225,6 +368,7 @@ export function HistoricoPage() {
           </Select>
         )}
 
+        <span className="secao-titulo">Período</span>
         <Button variante="secundario" bloco onClick={abrirSheetPeriodo}>
           {filtroPeriodo ? rotuloFiltroPeriodo(filtroPeriodo) : "Filtrar por período"}
         </Button>

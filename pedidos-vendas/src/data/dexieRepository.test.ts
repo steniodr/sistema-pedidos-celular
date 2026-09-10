@@ -123,8 +123,18 @@ describe("dexieRepository — backup e restaurar*", () => {
     const pedidoTeste = await dexieRepository.criarPedido({ clienteId: teste.id, marca: "MERKO" });
     await dexieRepository.salvarPedido({ ...pedidoTeste, teste: true });
 
+    await dexieRepository.salvarMarca({ nome: "Marca Real", visivelEmRelatorios: true });
+    await dexieRepository.salvarMarca({
+      nome: "Marca (teste)",
+      visivelEmRelatorios: false,
+      teste: true,
+    });
+
     const resultado = await dexieRepository.removerDadosTeste();
-    expect(resultado).toEqual({ clientes: 1, pedidos: 1 });
+    expect(resultado).toEqual({ clientes: 1, pedidos: 1, marcas: 1 });
+
+    const marcasRestantes = await db.marcas.toArray();
+    expect(marcasRestantes.map((m) => m.nome)).toEqual(["Marca Real"]);
 
     const clientesRestantes = await db.clientes.toArray();
     expect(clientesRestantes.map((c) => c.nome)).toEqual(["Cliente Real"]);
@@ -295,5 +305,75 @@ describe("dexieRepository — pedidos e código de orçamento", () => {
     const pedido2 = await novoPedido(); // numero 2
     expect(await dexieRepository.proximoNumeroPedido(pedido.id)).toBe(3);
     expect(await dexieRepository.proximoNumeroPedido(pedido2.id)).toBe(2);
+  });
+});
+
+describe("dexieRepository — marcas e grupos", () => {
+  beforeEach(async () => {
+    await Promise.all([db.marcas.clear(), db.pedidos.clear(), db.meta.clear()]);
+  });
+
+  it("salvarMarca não duplica quando o nome (normalizado) já existe", async () => {
+    const primeira = await dexieRepository.salvarMarca({
+      nome: "Arara Azul",
+      visivelEmRelatorios: true,
+    });
+    const segunda = await dexieRepository.salvarMarca({
+      nome: "ARARA AZUL",
+      visivelEmRelatorios: false,
+    });
+    expect(segunda.id).toBe(primeira.id);
+    expect(await db.marcas.count()).toBe(1);
+    expect((await dexieRepository.obterMarca(primeira.id))?.visivelEmRelatorios).toBe(false);
+  });
+
+  it("listarMarcas esconde marcas de teste, salvo incluirTeste", async () => {
+    await dexieRepository.salvarMarca({ nome: "Real", visivelEmRelatorios: true });
+    await dexieRepository.salvarMarca({ nome: "Teste 1", visivelEmRelatorios: false, teste: true });
+    expect((await dexieRepository.listarMarcas()).map((m) => m.nome)).toEqual(["Real"]);
+    expect((await dexieRepository.listarMarcas({ incluirTeste: true })).map((m) => m.nome)).toEqual([
+      "Real",
+      "Teste 1",
+    ]);
+  });
+
+  it("contarPedidosPorMarca soma por marcaId e pelo nome (legado sem marcaId)", async () => {
+    const cliente = await dexieRepository.salvarCliente({ nome: "C", cpfCnpj: CPF_VALIDO });
+    const marca = await dexieRepository.salvarMarca({ nome: "MERKO", visivelEmRelatorios: true });
+    await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO", marcaId: marca.id });
+    // Pedido legado: só o texto, sem marcaId.
+    const legado = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await db.pedidos.update(legado.id, { marcaId: undefined });
+
+    const contagem = await dexieRepository.contarPedidosPorMarca();
+    expect(contagem.get(marca.id)).toBe(2);
+  });
+
+  it("grupos de marca: cria, atualiza e remove", async () => {
+    const grupo = await dexieRepository.salvarGrupoMarca({ nome: "Empresa A", marcaIds: ["m1"] });
+    expect((await dexieRepository.listarGruposMarca())).toHaveLength(1);
+
+    await dexieRepository.salvarGrupoMarca({ id: grupo.id, nome: "Empresa A", marcaIds: ["m1", "m2"] });
+    const [atualizado] = await dexieRepository.listarGruposMarca();
+    expect(atualizado.marcaIds).toEqual(["m1", "m2"]);
+
+    await dexieRepository.removerGrupoMarca(grupo.id);
+    expect(await dexieRepository.listarGruposMarca()).toHaveLength(0);
+  });
+
+  it("removerDadosTeste também apaga marcas de teste, e backup leva marcas e grupos", async () => {
+    await dexieRepository.salvarMarca({ nome: "Real", visivelEmRelatorios: true });
+    await dexieRepository.salvarMarca({ nome: "Teste 1", visivelEmRelatorios: false, teste: true });
+    await dexieRepository.salvarGrupoMarca({ nome: "Empresa A", marcaIds: [] });
+
+    const backup = await dexieRepository.exportarBackup();
+    expect(backup.marcas?.map((m) => m.nome).sort()).toEqual(["Real", "Teste 1"]);
+    expect(backup.gruposMarca).toHaveLength(1);
+
+    const remocao = await dexieRepository.removerDadosTeste();
+    expect(remocao.marcas).toBe(1);
+    expect((await dexieRepository.listarMarcas({ incluirTeste: true })).map((m) => m.nome)).toEqual([
+      "Real",
+    ]);
   });
 });

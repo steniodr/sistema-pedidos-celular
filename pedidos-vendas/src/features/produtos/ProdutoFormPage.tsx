@@ -6,6 +6,14 @@ import { Button } from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/Confirm";
 import { Input } from "../../components/ui/Field";
 import { BarraInferior, Tela } from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { ZonaDeRisco } from "../../components/ui/ZonaDeRisco";
+import {
+  IconeEntrega,
+  IconeExcluir,
+  IconeLista,
+  IconeProduto,
+} from "../../components/ui/icones";
 import { useToast } from "../../components/ui/Toast";
 import { lerNumeroBR } from "../../domain/calculos";
 import { mensagemErro } from "../../domain/erros";
@@ -113,51 +121,77 @@ export function ProdutoFormPage() {
   }
 
   return (
-    <Tela titulo={id ? "Editar produto" : "Novo produto"} voltar={true} comBarraInferior>
-      <Input
-        rotulo="Nome"
-        obrigatorio
-        value={form.nome}
-        erro={erroNome}
-        onChange={(e) => campo("nome", e.target.value)}
-      />
-      <Input
-        rotulo="Categoria"
-        value={form.categoria ?? ""}
-        onChange={(e) => campo("categoria", e.target.value)}
-        ajuda="Usada pra agrupar vendas por categoria em Relatórios (opcional)."
-      />
-      <Input
-        rotulo="Detalhes"
-        value={form.detalhes ?? ""}
-        onChange={(e) => campo("detalhes", e.target.value)}
-        ajuda="Variação/observação da tabela de preços (opcional)."
-      />
-      <Input
-        rotulo="Variação"
-        value={form.variacao ?? ""}
-        onChange={(e) => campo("variacao", e.target.value)}
-        ajuda="Tamanho/tipo que não muda o preço (ex.: “#08”, “médio”) — some ao nome no Excel/PDF exportado (opcional)."
-      />
-      <Input
-        rotulo="Embalagem"
-        value={form.embalagem}
-        onChange={(e) => campo("embalagem", e.target.value)}
-      />
-      <Input
-        rotulo="Valor unitário (R$)"
-        obrigatorio
-        inputMode="decimal"
-        value={valorTexto}
-        erro={erroValor}
-        onChange={(e) => setValorTexto(e.target.value)}
-        onBlur={() => setErroValor(validarValor(valorTexto))}
-      />
+    <Tela
+      titulo={id ? form.nome || "Editar produto" : "Novo produto"}
+      subtitulo="Base de produtos"
+      voltar={true}
+      capa
+      comBarraInferior
+    >
+      <Painel titulo="Produto" icone={<IconeProduto size={17} />}>
+        <Input
+          rotulo="Nome"
+          obrigatorio
+          value={form.nome}
+          erro={erroNome}
+          onChange={(e) => campo("nome", e.target.value)}
+        />
+        <Input
+          rotulo="Categoria"
+          value={form.categoria ?? ""}
+          onChange={(e) => campo("categoria", e.target.value)}
+          ajuda="Agrupa as vendas por categoria em Relatórios (opcional)."
+        />
+      </Painel>
+
+      {/* "Detalhes" e "Variação" eram dois campos livres vizinhos que só se
+          distinguiam por um parágrafo de ajuda. Agora vêm juntos, com exemplo
+          no próprio campo e a diferença dita numa linha só. */}
+      <Painel titulo="Variante" icone={<IconeLista size={17} />}>
+        <Input
+          rotulo="Detalhes"
+          placeholder="Ex.: exceto amarelo, laranja e vermelho"
+          value={form.detalhes ?? ""}
+          onChange={(e) => campo("detalhes", e.target.value)}
+        />
+        <Input
+          rotulo="Variação"
+          placeholder="Ex.: #08, médio"
+          value={form.variacao ?? ""}
+          onChange={(e) => campo("variacao", e.target.value)}
+        />
+        <p className="texto-suave">
+          <strong>Detalhes</strong> distingue produtos de preços diferentes.{" "}
+          <strong>Variação</strong> é tamanho/tipo que não muda o preço e some ao nome no
+          Excel/PDF.
+        </p>
+      </Painel>
+
+      <Painel titulo="Embalagem e preço" icone={<IconeEntrega size={17} />}>
+        <Input
+          rotulo="Embalagem"
+          placeholder="Ex.: Galão 3,6 L"
+          value={form.embalagem}
+          onChange={(e) => campo("embalagem", e.target.value)}
+        />
+        <Input
+          rotulo="Valor unitário (R$)"
+          obrigatorio
+          inputMode="decimal"
+          value={valorTexto}
+          erro={erroValor}
+          onChange={(e) => setValorTexto(e.target.value)}
+          onBlur={() => setErroValor(validarValor(valorTexto))}
+        />
+      </Painel>
 
       {id && (
-        <Button variante="perigo" onClick={excluir} disabled={excluindo}>
-          {excluindo ? "Excluindo…" : "Excluir produto"}
-        </Button>
+        <ZonaDeRisco descricao="Pedidos já feitos guardam o nome e o preço do produto, então não mudam.">
+          <Button variante="perigo" onClick={excluir} disabled={excluindo}>
+            <IconeExcluir size={16} />
+            {excluindo ? "Excluindo…" : "Excluir produto"}
+          </Button>
+        </ZonaDeRisco>
       )}
 
       <BarraInferior>

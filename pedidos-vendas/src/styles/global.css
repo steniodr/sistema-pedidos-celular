@@ -1,3 +1,22 @@
+/* Fonte de título/wordmark — self-hosted em /public/fonts (URL estável, sem
+   hash), pré-carregada no index.html e no precache do PWA (globPattern woff2).
+   `swap` + fallback de métricas próximas: o primeiro paint nunca espera a fonte
+   e, com o preload, a troca é praticamente imperceptível. */
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/poppins-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/poppins-700.woff2") format("woff2");
+}
+
 :root {
   --cor-primaria: #1d4ed8;
   --cor-primaria-escura: #1e40af;
@@ -14,10 +33,26 @@
   --cor-erro: #b91c1c;
   --cor-erro-fundo: #fef2f2;
 
+  /* Identidade (amostrada do logo em public/icons/Pedidos.png) */
+  --cor-marca: #14264f;
+  --cor-marca-acento: #6fa1e8;
+  --cor-marca-contraste: #ffffff;
+
+  /* Escala de espaco nomeada — antes conviviam 4/8/12/16 sem regra. */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+
   --raio: 12px;
   --raio-pequeno: 8px;
+  --raio-icone: 10px;
   --sombra: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.1);
   --alvo-toque: 44px;
+
+  --fonte-titulo: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --espaco-topo: env(safe-area-inset-top, 0px);
   --espaco-base: env(safe-area-inset-bottom, 0px);

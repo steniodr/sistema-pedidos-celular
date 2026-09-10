@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   aplicarDesconto,
+  arredondar,
   lerNumeroBR,
   subtotal,
   totaisPedido,
   totalItem,
   valorDesconto,
+  valoresLiquidosItens,
 } from "./calculos";
 import type { ItemPedido } from "./types";
 
@@ -85,6 +87,46 @@ describe("totaisPedido", () => {
     expect(totais.subtotal).toBe(1500);
     expect(totais.desconto).toBe(100);
     expect(totais.total).toBe(1400);
+  });
+});
+
+describe("valoresLiquidosItens", () => {
+  it("sem desconto no pedido, devolve o bruto de cada item", () => {
+    const itens = [item(2, 50), item(1, 300)];
+    expect(valoresLiquidosItens({ itens, descontoTipo: "percentual", descontoValor: 0 })).toEqual([
+      100, 300,
+    ]);
+  });
+
+  it("rateia o desconto do pedido na proporção do bruto e a soma bate com o total", () => {
+    const pedido = {
+      itens: [item(10, 95.64), item(2, 453.31)],
+      descontoTipo: "percentual" as const,
+      descontoValor: 10,
+    };
+    const liquidos = valoresLiquidosItens(pedido);
+    const soma = arredondar(liquidos.reduce((s, v) => s + v, 0));
+    expect(soma).toBe(totaisPedido(pedido).total);
+  });
+
+  it("com resíduo de arredondamento, joga a sobra no último item rateado", () => {
+    // 3 itens iguais + desconto que não divide certo por 3.
+    const pedido = {
+      itens: [item(1, 100), item(1, 100), item(1, 100)],
+      descontoTipo: "valor" as const,
+      descontoValor: 10,
+    };
+    const liquidos = valoresLiquidosItens(pedido);
+    expect(arredondar(liquidos.reduce((s, v) => s + v, 0))).toBe(290);
+  });
+
+  it("itens 'com desconto' ficam com o bruto; o rateio só atinge os demais", () => {
+    const pedido = {
+      itens: [item(1, 1000), item(1, 500, true)],
+      descontoTipo: "percentual" as const,
+      descontoValor: 10,
+    };
+    expect(valoresLiquidosItens(pedido)).toEqual([900, 500]);
   });
 });
 

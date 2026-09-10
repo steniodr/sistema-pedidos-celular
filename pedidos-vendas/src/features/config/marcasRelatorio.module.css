@@ -1,0 +1,39 @@
+.marcasGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* "Marcar/desmarcar todas": links discretos, nao botoes que competem com o
+   conteudo da lista. */
+.acoesMassa {
+  display: flex;
+  gap: var(--esp-2);
+  margin-bottom: var(--esp-1);
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: 14px;
+  background: var(--cor-fundo);
+}
+
+.novoGrupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+  padding: var(--esp-3);
+  border: 1px dashed var(--cor-borda);
+  border-radius: 14px;
+}
+
+.grupoAcoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+}

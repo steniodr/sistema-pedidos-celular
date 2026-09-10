@@ -48,6 +48,49 @@ export function totaisPedido(
   return { subtotal: sub, desconto, total: arredondar(sub - desconto) };
 }
 
+/**
+ * Valor líquido de cada item do pedido, na mesma ordem de `pedido.itens` — o
+ * bruto (`qtd × valorUnit`) menos a fatia proporcional do desconto do pedido.
+ *
+ * Usado nos Relatórios para que a soma por produto/categoria bata exatamente
+ * com o "Total vendido" do card (que é `totaisPedido().total`). O desconto do
+ * pedido é rateado só entre os itens que entram na base dele (sem `comDesconto`,
+ * igual a `totaisPedido`), na proporção do bruto de cada um. O resíduo de
+ * arredondamento (centavos) vai para o último item rateado, garantindo
+ * `Σ líquidos === total`.
+ */
+export function valoresLiquidosItens(
+  pedido: Pick<Pedido, "itens" | "descontoTipo" | "descontoValor">,
+): number[] {
+  const brutos = pedido.itens.map((item) => totalItem(item));
+  const { desconto } = totaisPedido(pedido);
+  if (desconto <= 0) return brutos;
+
+  const baseDescontavel = pedido.itens.reduce(
+    (soma, item, i) => (item.comDesconto ? soma : soma + brutos[i]),
+    0,
+  );
+  if (baseDescontavel <= 0) return brutos;
+
+  const liquidos = [...brutos];
+  let descontoAplicado = 0;
+  let ultimoRateado = -1;
+  for (let i = 0; i < pedido.itens.length; i++) {
+    if (pedido.itens[i].comDesconto) continue;
+    const fatia = arredondar(desconto * (brutos[i] / baseDescontavel));
+    liquidos[i] = arredondar(brutos[i] - fatia);
+    descontoAplicado = arredondar(descontoAplicado + fatia);
+    ultimoRateado = i;
+  }
+  // Joga o resíduo de arredondamento no último item rateado.
+  if (ultimoRateado >= 0 && descontoAplicado !== desconto) {
+    liquidos[ultimoRateado] = arredondar(
+      liquidos[ultimoRateado] + (descontoAplicado - desconto),
+    );
+  }
+  return liquidos;
+}
+
 const formatadorMoeda = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",

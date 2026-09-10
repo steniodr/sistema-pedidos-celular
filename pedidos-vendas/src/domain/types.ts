@@ -80,11 +80,37 @@ export interface ItemPedido {
 export type DescontoTipo = "percentual" | "valor";
 export type StatusPedido = "rascunho" | "enviado";
 
+/**
+ * Marca cadastrada previamente (padroniza o texto do cabeçalho da planilha e o
+ * agrupamento nos Relatórios). O pedido guarda o `nome` em `Pedido.marca` (para
+ * Excel/PDF/busca) e a referência estável em `Pedido.marcaId`.
+ */
+export interface Marca {
+  id: string;
+  /** Como aparece no cabeçalho da planilha e nos filtros (ex.: "ARARA AZUL"). */
+  nome: string;
+  /** Marcas desligadas não entram em nenhum total de Relatórios, nem em "Tudo". */
+  visivelEmRelatorios: boolean;
+  /** Criada pelo gerador de dados de teste (Ambiente de teste) — nunca some nos números reais. */
+  teste?: boolean;
+  criadoEm: ISODateTime;
+  atualizadoEm: ISODateTime;
+}
+
+/** Conjunto nomeado de marcas (ex.: "Empresa A") — atalho de filtro nos Relatórios. */
+export interface GrupoMarca {
+  id: string;
+  nome: string;
+  marcaIds: string[];
+}
+
 export interface Pedido {
   id: string;
   numero: number;
-  /** Texto livre do cabeçalho da planilha (ex.: MERKO, ARARA AZUL). */
+  /** Nome da marca escolhida no cadastro — vai para o cabeçalho da planilha (ex.: MERKO, ARARA AZUL). */
   marca: string;
+  /** Referência estável para a `Marca` cadastrada; ausente em pedidos anteriores ao cadastro de marcas. */
+  marcaId?: string;
   clienteId: string;
   dataPedido: string;
   representanteNome?: string;

@@ -1,21 +1,4 @@
-.linhaCliente {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.linhaClienteInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.botaoEditar {
-  flex-shrink: 0;
-  width: var(--alvo-toque);
-  height: var(--alvo-toque);
-  padding: 0;
-  font-size: 1.1rem;
-}
 
 .resumoImport {
   display: flex;
@@ -44,25 +27,6 @@
   width: auto;
 }
 
-.tagSituacao {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.tagSituacao--inativo {
-  background: var(--cor-erro-fundo);
-  color: var(--cor-erro);
-}
-
-.tagSituacao--atencao {
-  background: var(--cor-alerta-fundo);
-  color: var(--cor-alerta);
-}
-
 .detalhesAviso {
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio);
@@ -80,4 +44,91 @@
 .detalhesAviso ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+
+/* Dois campos curtos lado a lado (documento+codigo, bairro+CEP). */
+.duplo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--esp-3);
+  align-items: start;
+}
+
+/* Cidade ocupa o espaco; UF cabe em duas letras. */
+.cidadeUf {
+  display: grid;
+  grid-template-columns: 1fr 88px;
+  gap: var(--esp-3);
+  align-items: start;
+}
+
+.resumoChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Assistente de importacao — mesmas pecas usadas em produtos. */
+.arquivoEscolhido {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+}
+
+.arquivoIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--raio-icone);
+  background: var(--cor-sucesso-fundo);
+  color: var(--cor-sucesso);
+}
+
+.arquivoInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.arquivoNome {
+  font-weight: 600;
+  font-size: 0.84375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkArquivo {
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 4px 6px;
+  color: var(--cor-primaria);
+  font-size: 0.78125rem;
+  font-weight: 700;
+}
+
+.mapa { display: flex; align-items: flex-end; gap: var(--esp-2); }
+.mapa > :first-child { flex: 1; min-width: 0; }
+
+.amostraLinha {
+  display: flex;
+  align-items: baseline;
+  gap: var(--esp-2);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: 0.8125rem;
+}
+
+.amostraLinha:last-child { border-bottom: none; }
+
+.amostraNome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

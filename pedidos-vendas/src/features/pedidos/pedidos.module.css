@@ -165,3 +165,170 @@
   font-size: 1.25rem;
   line-height: 1;
 }
+
+/* Acao compacta no cabecalho de um Painel (ex.: "Adicionar" nos itens). */
+.acaoPainel {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 4px 8px;
+  color: var(--cor-primaria);
+  font-size: 0.8125rem;
+}
+
+/* Produto ja resolvido: nome + variantes como etiquetas (antes eram campos
+   readOnly, que pareciam campos vazios que o vendedor esqueceu de preencher). */
+.produtoNome {
+  font-weight: 600;
+  font-size: 0.96875rem;
+}
+
+.produtoVariantes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Quantidade e valor lado a lado. */
+.duplo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--esp-3);
+  align-items: start;
+}
+
+/* A conta do item, visivel logo abaixo dos dois numeros que a formam. */
+.contaItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* Valor do pedido no canto direito da capa. */
+.capaValor {
+  flex-shrink: 0;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+/* Bloco unico de pendencias (antes: um slab vermelho por problema). */
+.bloqueio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #fecaca;
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.bloqueioCabecalho { display: flex; align-items: center; gap: 10px; }
+
+.bloqueioIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+}
+
+.bloqueioTitulo { flex: 1; font-weight: 700; font-size: 0.90625rem; color: var(--cor-erro); }
+
+.bloqueioItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.8125rem;
+  color: #7f1d1d;
+}
+
+.bloqueioPonto {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--cor-erro);
+}
+
+/* Link discreto colado num campo ("usar do cliente"). */
+.linkCampo {
+  align-self: flex-start;
+  min-height: 0;
+  margin-top: -6px;
+  padding: 2px 0;
+  color: var(--cor-primaria);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.totalBloqueado { font-size: 0.9375rem; font-weight: 700; color: var(--cor-erro); }
+
+/* Card de conferência do "Salvar como orçamento", dentro da folha de exportar. */
+.confirmaOrcamento {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.confirmaOrcamentoCodigo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Filtros ativos visiveis como etiquetas removiveis (antes: so um badge com o total). */
+.filtrosAtivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.chipToken {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--cor-primaria);
+  border-radius: 999px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-size: 0.78125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkLimpar {
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  color: var(--cor-primaria);
+  font-size: 0.78125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Botao "..." na ponta de uma linha de lista. */
+.botaoLinhaAcao {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  color: #94a3b8;
+}

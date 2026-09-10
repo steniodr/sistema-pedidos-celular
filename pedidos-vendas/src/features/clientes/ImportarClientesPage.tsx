@@ -4,7 +4,17 @@ import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Field";
-import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
+import { BarraInferior, Tela } from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { Passos } from "../../components/ui/Passos";
+import { Etiqueta } from "../../components/ui/Etiqueta";
+import {
+  IconeCliente,
+  IconeLista,
+  IconeOk,
+  IconePlanilha,
+  IconeSeta,
+} from "../../components/ui/icones";
 import { useToast } from "../../components/ui/Toast";
 import { mascararCpfCnpj, somenteDigitos } from "../../domain/cpfCnpj";
 import { mensagemErro } from "../../domain/erros";
@@ -44,9 +54,9 @@ export function ImportarClientesPage() {
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [planilha, setPlanilha] = useState<PlanilhaLidaClientes | null>(null);
   const [mapeamento, setMapeamento] = useState<MapeamentoClientes | null>(null);
-  const [colunasAbertas, setColunasAbertas] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [passoConferencia, setPassoConferencia] = useState(false);
 
   const { dados: docsExistentes } = useDados(async () => {
     const clientes = await repo.listarClientes();
@@ -67,7 +77,7 @@ export function ImportarClientesPage() {
       setMapeamento(lida.mapeamento);
       setNomeArquivo(arquivo.name);
       const cabecalhoNaoIdentificado = lida.linhaCabecalho === -1;
-      setColunasAbertas(cabecalhoNaoIdentificado);
+      setPassoConferencia(false);
       if (cabecalhoNaoIdentificado) {
         toast.info("Não identifiquei o cabeçalho. Confira as colunas abaixo.");
       }
@@ -99,14 +109,17 @@ export function ImportarClientesPage() {
   const colunas = planilha?.cabecalho ?? [];
   const prontoParaImportar = (resultado?.clientes.length ?? 0) > 0;
 
-  return (
-    <Tela titulo="Importar clientes" voltar={true} comBarraInferior>
-      <p className="texto-suave">
-        Selecione a base de clientes (.xlsx, .xls ou .csv). Clientes já
-        cadastrados são identificados pelo CPF/CNPJ e têm os dados
-        atualizados — nenhum cliente existente é apagado.
-      </p>
+  const passo = !planilha ? 0 : passoConferencia ? 2 : 1;
 
+  return (
+    <Tela
+      titulo="Importar clientes"
+      subtitulo={`Passo ${passo + 1} de 3 · ${["escolher arquivo", "conferir colunas", "conferir e importar"][passo]}`}
+      voltar={true}
+      capa
+      comBarraInferior
+      abaixoDoTitulo={<Passos rotulos={["Arquivo", "Colunas", "Conferir"]} atual={passo} />}
+    >
       <input
         ref={inputArquivo}
         type="file"
@@ -117,50 +130,81 @@ export function ImportarClientesPage() {
           e.target.value = "";
         }}
       />
-      <Button variante="secundario" bloco onClick={() => inputArquivo.current?.click()}>
-        {lendo ? "Lendo arquivo…" : nomeArquivo || "Escolher arquivo"}
-      </Button>
 
-      {planilha && mapeamento && (
-        <>
-          <div className="linha linha--entre">
-            <h2 className="secao-titulo">Colunas</h2>
-            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
-              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
-            </Button>
-          </div>
-          {!colunasAbertas && (
-            <p className="texto-suave">Colunas identificadas automaticamente.</p>
-          )}
-          {colunasAbertas &&
-            (Object.keys(ROTULOS) as CampoCliente[]).map((campo) => (
-              <Select
-                key={campo}
-                rotulo={ROTULOS[campo]}
-                value={mapeamento[campo] ?? ""}
-                obrigatorio={CAMPOS_OBRIGATORIOS.includes(campo)}
-                onChange={(e) =>
-                  setMapeamento({
-                    ...mapeamento,
-                    [campo]: e.target.value === "" ? null : Number(e.target.value),
-                  })
-                }
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-            ))}
-        </>
+      {passo === 0 && (
+        <Painel titulo="Arquivo" icone={<IconePlanilha size={17} />}>
+          <p className="texto-suave">
+            Base de clientes em .xlsx, .xls ou .csv. Quem já existe é reconhecido pelo CPF/CNPJ e
+            tem os dados atualizados — <strong>nenhum cliente é apagado</strong>.
+          </p>
+          <Button
+            variante="secundario"
+            bloco
+            onClick={() => inputArquivo.current?.click()}
+            disabled={lendo}
+          >
+            {lendo ? "Lendo arquivo…" : "Escolher arquivo"}
+          </Button>
+        </Painel>
       )}
 
-      {planilha && resultado && (
+      {planilha && (
+        <div className={css.arquivoEscolhido}>
+          <span className={css.arquivoIcone}>
+            <IconePlanilha size={19} />
+          </span>
+          <span className={css.arquivoInfo}>
+            <span className={css.arquivoNome}>{nomeArquivo}</span>
+            <span className="texto-suave">{colunas.length} colunas na planilha</span>
+          </span>
+          <Button
+            variante="fantasma"
+            className={css.linkArquivo}
+            onClick={() => inputArquivo.current?.click()}
+          >
+            Trocar
+          </Button>
+        </div>
+      )}
+
+      {passo === 1 && (
+        <Painel titulo="Colunas" icone={<IconeLista size={17} />}>
+          {(Object.keys(ROTULOS) as CampoCliente[]).map((campo) => {
+            const atual = mapeamento?.[campo] ?? null;
+            return (
+              <div key={campo} className={css.mapa}>
+                <Select
+                  rotulo={`Vira ${ROTULOS[campo]}`}
+                  obrigatorio={CAMPOS_OBRIGATORIOS.includes(campo)}
+                  value={atual === null ? "" : String(atual)}
+                  onChange={(e) =>
+                    setMapeamento({
+                      ...(mapeamento as MapeamentoClientes),
+                      [campo]: e.target.value === "" ? null : Number(e.target.value),
+                    })
+                  }
+                >
+                  <option value="">— não usar —</option>
+                  {colunas.map((nome, i) => (
+                    <option key={i} value={i}>
+                      {nome || `Coluna ${i + 1}`}
+                    </option>
+                  ))}
+                </Select>
+                {atual === null ? (
+                  <Etiqueta>vazia</Etiqueta>
+                ) : (
+                  <Etiqueta variante="sucesso">reconhecida</Etiqueta>
+                )}
+              </div>
+            );
+          })}
+        </Painel>
+      )}
+
+      {passo === 2 && resultado && (
         <>
-          <h2 className="secao-titulo">Conferência</h2>
-          <Cartao>
+          <Painel titulo="Conferência" icone={<IconeOk size={17} />}>
             <div className={css.resumoImport}>
               <div className={css.resumoImportItem}>
                 <span className={css.resumoImportValor}>{resultado.clientes.length}</span>
@@ -171,47 +215,70 @@ export function ImportarClientesPage() {
                 <span className="texto-suave">linhas com aviso</span>
               </div>
             </div>
-          </Cartao>
+          </Painel>
 
           {resultado.clientes.length > 0 && (
-            <div className="pilha">
-              {resultado.clientes.slice(0, 10).map((c, i) => {
-                const existe = docsExistentes?.has(somenteDigitos(c.cpfCnpj));
-                return (
-                  <Cartao key={i}>
-                    <div className="linha linha--entre">
-                      <span className="texto-forte">{c.nome}</span>
-                      <span className="texto-suave">{existe ? "Atualiza" : "Novo"}</span>
+            <Painel titulo="Amostra" icone={<IconeCliente size={17} />}>
+              <div className="pilha pilha--apertada">
+                {resultado.clientes.slice(0, 10).map((cliente, i) => {
+                  const jaExiste = docsExistentes?.has(somenteDigitos(cliente.cpfCnpj));
+                  return (
+                    <div key={i} className={css.amostraLinha}>
+                      <span className={css.amostraNome}>{cliente.nome}</span>
+                      <span className="texto-suave">{mascararCpfCnpj(cliente.cpfCnpj)}</span>
+                      {/* Novo x Atualiza era texto cinza igual ao resto; virou
+                          etiqueta, que é o dado mais importante da conferência. */}
+                      <Etiqueta variante={jaExiste ? "info" : "sucesso"}>
+                        {jaExiste ? "Atualiza" : "Novo"}
+                      </Etiqueta>
                     </div>
-                    <div className="texto-suave">
-                      {mascararCpfCnpj(c.cpfCnpj)}
-                      {c.cidadeEstado ? ` · ${c.cidadeEstado}` : ""}
-                    </div>
-                  </Cartao>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              {resultado.clientes.length > 10 && (
+                <p className="texto-suave">Mostrando 10 de {resultado.clientes.length}.</p>
+              )}
+            </Painel>
           )}
 
           {resultado.ignorados.length > 0 && (
             <details className={css.detalhesAviso}>
               <summary>Ver linhas com aviso ({resultado.ignorados.length})</summary>
               <ul className="texto-suave">
-                {resultado.ignorados.slice(0, 30).map((ig, i) => (
+                {resultado.ignorados.slice(0, 30).map((linha, i) => (
                   <li key={i}>
-                    Linha {ig.linha}: {ig.motivo}
+                    Linha {linha.linha}: {linha.motivo}
                   </li>
                 ))}
               </ul>
+              {resultado.ignorados.length > 30 && (
+                <p className="texto-suave">Mostrando 30 de {resultado.ignorados.length}.</p>
+              )}
             </details>
           )}
         </>
       )}
 
       <BarraInferior>
-        <Button bloco onClick={confirmar} disabled={!prontoParaImportar || confirmando}>
-          {confirmando ? "Importando…" : `Importar (${resultado?.clientes.length ?? 0})`}
-        </Button>
+        {passo === 2 ? (
+          <div className={css.botoesRodape}>
+            <Button variante="secundario" bloco onClick={() => setPassoConferencia(false)}>
+              Voltar
+            </Button>
+            <Button bloco disabled={!prontoParaImportar || confirmando} onClick={confirmar}>
+              {confirmando ? "Importando…" : `Importar (${resultado?.clientes.length ?? 0})`}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            bloco
+            disabled={passo === 0 || !prontoParaImportar}
+            onClick={() => setPassoConferencia(true)}
+          >
+            Conferir
+            <IconeSeta size={17} />
+          </Button>
+        )}
       </BarraInferior>
     </Tela>
   );

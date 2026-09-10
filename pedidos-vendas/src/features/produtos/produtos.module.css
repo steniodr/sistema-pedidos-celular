@@ -35,17 +35,6 @@
   white-space: nowrap;
 }
 
-.listaProduto {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.listaProdutoInfo {
-  flex: 1;
-  min-width: 0;
-}
-
 .botoesRodape {
   display: flex;
   gap: 8px;
@@ -55,46 +44,6 @@
 .botoesRodape > * {
   flex: 1;
   width: auto;
-}
-
-.botaoEditarProduto {
-  flex-shrink: 0;
-  width: var(--alvo-toque);
-  height: var(--alvo-toque);
-  padding: 0;
-  font-size: 1.1rem;
-}
-
-.previaTabela {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.previaTabela th,
-.previaTabela td {
-  text-align: left;
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--cor-borda);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-
-.previaTabela th {
-  color: var(--cor-texto-suave);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.previaRolagem {
-  overflow-x: auto;
-  background: var(--cor-superficie);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
-  padding: 0 12px;
 }
 
 .resumoImport {
@@ -131,3 +80,102 @@
   margin: 8px 0 0;
   padding-left: 18px;
 }
+
+/* Aviso de lista truncada — antes o corte em 100 linhas era silencioso. */
+.avisoLimite {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-alerta-fundo);
+  border: 1px solid #fde68a;
+  color: var(--cor-alerta);
+  font-size: 0.78125rem;
+  line-height: 1.45;
+}
+
+/* Cartao do arquivo escolhido no assistente de importacao. */
+.arquivoEscolhido {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+}
+
+.arquivoIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--raio-icone);
+  background: var(--cor-sucesso-fundo);
+  color: var(--cor-sucesso);
+}
+
+.arquivoInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.arquivoNome {
+  font-weight: 600;
+  font-size: 0.84375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkArquivo {
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 4px 6px;
+  color: var(--cor-primaria);
+  font-size: 0.78125rem;
+  font-weight: 700;
+}
+
+/* Linha "coluna da planilha -> vira campo". */
+.mapa {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--esp-2);
+}
+
+.mapa > :first-child { flex: 1; min-width: 0; }
+
+/* Amostra do que sera importado, sem tabela com rolagem horizontal. */
+.amostraLinha {
+  display: flex;
+  align-items: baseline;
+  gap: var(--esp-2);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: 0.8125rem;
+}
+
+.amostraLinha:last-child { border-bottom: none; }
+
+.amostraNome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avisoSubstituir {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: var(--raio);
+  background: var(--cor-erro-fundo);
+  color: #7f1d1d;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.avisoSubstituirIcone { flex-shrink: 0; color: var(--cor-erro); display: flex; margin-top: 1px; }

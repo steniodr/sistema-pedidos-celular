@@ -1,4 +1,4 @@
-import { totaisPedido, totalItem } from "./calculos";
+import { totaisPedido, valoresLiquidosItens } from "./calculos";
 import type { Pedido } from "./types";
 
 /**
@@ -45,11 +45,111 @@ export function intervaloPeriodo(periodo: Periodo, referencia: Date = new Date()
   return { inicio: null, fim: null };
 }
 
+// ── Navegação de período (tipo + seleção de um ou mais períodos concretos) ──
+
+/** Só "semana" e "mes" navegam períodos concretos; "tudo" não tem chave. */
+export type TipoPeriodo = Exclude<Periodo, "tudo">;
+
+export interface PeriodoOpcao {
+  /** `YYYY-MM` (mês) ou `YYYY-MM-DD` do domingo (semana) — ordenável como string. */
+  chave: string;
+  rotulo: string;
+  inicio: string;
+  fim: string;
+}
+
+const TETO_PERIODOS: Record<TipoPeriodo, number> = { mes: 24, semana: 12 };
+const MESES_LONGOS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+function domingoDaSemana(referencia: Date): Date {
+  const d = new Date(referencia);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+/** Chave do período (mês/semana) que contém a data de referência. */
+export function chavePeriodo(tipo: TipoPeriodo, referencia: Date = new Date()): string {
+  if (tipo === "mes") {
+    return `${referencia.getFullYear()}-${String(referencia.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return paraChaveData(domingoDaSemana(referencia));
+}
+
+/** Intervalo `{inicio, fim}` de uma chave de período. */
+export function intervaloDaChave(tipo: TipoPeriodo, chave: string): IntervaloData {
+  if (tipo === "mes") {
+    const [ano, mes] = chave.split("-").map(Number);
+    return inicioFimMes(new Date(ano, mes - 1, 1));
+  }
+  const [ano, mes, dia] = chave.split("-").map(Number);
+  return inicioFimSemana(new Date(ano, mes - 1, dia));
+}
+
+/** Rótulo curto de um período ("Mês atual", "Setembro/26", "Semana atual", "2ª sem · 08–14/09"). */
+export function rotuloPeriodo(
+  tipo: TipoPeriodo,
+  chave: string,
+  referencia: Date = new Date(),
+): string {
+  if (chave === chavePeriodo(tipo, referencia)) {
+    return tipo === "mes" ? "Mês atual" : "Semana atual";
+  }
+  if (tipo === "mes") {
+    const [ano, mes] = chave.split("-").map(Number);
+    return `${MESES_LONGOS[mes - 1]}/${String(ano).slice(2)}`;
+  }
+  const { inicio, fim } = intervaloDaChave("semana", chave);
+  const [, mi, di] = (inicio ?? "").split("-");
+  const [, mf, df] = (fim ?? "").split("-");
+  const domingo = new Date(chave + "T00:00:00");
+  const ordinal = Math.floor((domingo.getDate() - 1) / 7) + 1;
+  return `${ordinal}ª sem · ${di}/${mi}–${df}/${mf}`;
+}
+
+/**
+ * Períodos concretos que o vendedor pode escolher, do mais recente ao mais
+ * antigo: do período atual até o do pedido mais antigo, limitado por
+ * `TETO_PERIODOS`. O período atual entra sempre, mesmo sem pedidos.
+ */
+export function periodosDisponiveis(
+  pedidos: Pedido[],
+  tipo: TipoPeriodo,
+  referencia: Date = new Date(),
+): PeriodoOpcao[] {
+  const chaves = new Set<string>([chavePeriodo(tipo, referencia)]);
+  for (const p of pedidos) {
+    if (!p.dataPedido) continue;
+    chaves.add(chavePeriodo(tipo, new Date(p.dataPedido + "T00:00:00")));
+  }
+  return [...chaves]
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+    .slice(0, TETO_PERIODOS[tipo])
+    .map((chave) => {
+      const { inicio, fim } = intervaloDaChave(tipo, chave);
+      return { chave, rotulo: rotuloPeriodo(tipo, chave, referencia), inicio: inicio!, fim: fim! };
+    });
+}
+
+/** `true` se a data cai em algum dos intervalos (união dos períodos selecionados). */
+export function emAlgumIntervalo(dataPedido: string, intervalos: IntervaloData[]): boolean {
+  return intervalos.some(
+    (i) => (!i.inicio || dataPedido >= i.inicio) && (!i.fim || dataPedido <= i.fim),
+  );
+}
+
 export interface FiltroRelatorio {
   inicio?: string | null;
   fim?: string | null;
+  /** União de períodos selecionados; quando presente, substitui `inicio`/`fim`. */
+  intervalos?: IntervaloData[];
   clienteId?: string;
   marca?: string;
+  /** Marcas aceitas (nomes). Vazio/ausente = todas. */
+  marcasIn?: string[];
   /** Só entram no relatório pedidos "enviado" — rascunho não é venda fechada. */
   status?: Pedido["status"];
 }
@@ -57,10 +157,15 @@ export interface FiltroRelatorio {
 export function filtrarPedidos(pedidos: Pedido[], filtro: FiltroRelatorio): Pedido[] {
   return pedidos.filter((p) => {
     if (filtro.status && p.status !== filtro.status) return false;
-    if (filtro.inicio && p.dataPedido < filtro.inicio) return false;
-    if (filtro.fim && p.dataPedido > filtro.fim) return false;
+    if (filtro.intervalos?.length) {
+      if (!emAlgumIntervalo(p.dataPedido, filtro.intervalos)) return false;
+    } else {
+      if (filtro.inicio && p.dataPedido < filtro.inicio) return false;
+      if (filtro.fim && p.dataPedido > filtro.fim) return false;
+    }
     if (filtro.clienteId && p.clienteId !== filtro.clienteId) return false;
     if (filtro.marca && p.marca !== filtro.marca) return false;
+    if (filtro.marcasIn?.length && !filtro.marcasIn.includes(p.marca)) return false;
     return true;
   });
 }
@@ -93,13 +198,16 @@ export function produtosMaisVendidos(
 ): ProdutoMaisVendido[] {
   const porNome = new Map<string, ProdutoMaisVendido>();
   for (const pedido of pedidos) {
-    for (const item of pedido.itens) {
+    // Valor líquido (com a fatia proporcional do desconto do pedido) para a
+    // soma por produto bater com o "Total vendido" do card.
+    const liquidos = valoresLiquidosItens(pedido);
+    pedido.itens.forEach((item, i) => {
       const nome = item.nomeProduto ?? item.descricaoProduto;
       const atual = porNome.get(nome) ?? { nome, quantidade: 0, valorTotal: 0 };
       atual.quantidade += item.qtd || 0;
-      atual.valorTotal += totalItem(item);
+      atual.valorTotal += liquidos[i];
       porNome.set(nome, atual);
-    }
+    });
   }
   const sinal = ordem === "desc" ? -1 : 1;
   return [...porNome.values()]
@@ -135,6 +243,32 @@ export function clientesMaisVendidos(
   }
   const sinal = ordem === "desc" ? -1 : 1;
   return [...porCliente.values()]
+    .sort((a, b) => sinal * (a.valorTotal - b.valorTotal))
+    .slice(0, limite);
+}
+
+export interface MarcaMaisVendida {
+  marca: string;
+  quantidadePedidos: number;
+  valorTotal: number;
+}
+
+/** Espelha `clientesMaisVendidos`, agrupando por marca — visão "por marca" de Relatórios. */
+export function marcasMaisVendidas(
+  pedidos: Pedido[],
+  limite = 10,
+  ordem: OrdemValor = "desc",
+): MarcaMaisVendida[] {
+  const porMarca = new Map<string, MarcaMaisVendida>();
+  for (const pedido of pedidos) {
+    const marca = pedido.marca || "Sem marca";
+    const atual = porMarca.get(marca) ?? { marca, quantidadePedidos: 0, valorTotal: 0 };
+    atual.quantidadePedidos += 1;
+    atual.valorTotal += totaisPedido(pedido).total;
+    porMarca.set(marca, atual);
+  }
+  const sinal = ordem === "desc" ? -1 : 1;
+  return [...porMarca.values()]
     .sort((a, b) => sinal * (a.valorTotal - b.valorTotal))
     .slice(0, limite);
 }
@@ -186,6 +320,18 @@ export function granularidadePara(periodo: Periodo): Granularidade {
   return periodo === "tudo" ? "mes" : "dia";
 }
 
+/**
+ * Granularidade do gráfico de linha conforme a seleção de período: diária só
+ * quando o recorte é um único mês/semana; caso contrário (vários períodos ou
+ * "tudo") o eixo fica mensal para não virar um matagal de pontos.
+ */
+export function granularidadeParaSelecao(
+  tipo: Periodo,
+  qtdPeriodos: number,
+): Granularidade {
+  return tipo === "tudo" || qtdPeriodos > 1 ? "mes" : "dia";
+}
+
 const MESES_ABREVIADOS = [
   "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
 ];
@@ -228,11 +374,12 @@ export function serieTemporalItens(
   const totalPorChave = new Map<string, number>();
   for (const pedido of pedidos) {
     const chave = chaveData(pedido.dataPedido, granularidade);
-    for (const item of pedido.itens) {
+    const liquidos = valoresLiquidosItens(pedido);
+    pedido.itens.forEach((item, i) => {
       const nome = item.nomeProduto ?? item.descricaoProduto;
-      if (!nomes.has(nome)) continue;
-      totalPorChave.set(chave, (totalPorChave.get(chave) ?? 0) + totalItem(item));
-    }
+      if (!nomes.has(nome)) return;
+      totalPorChave.set(chave, (totalPorChave.get(chave) ?? 0) + liquidos[i]);
+    });
   }
   return ordenarSerie(totalPorChave, granularidade);
 }

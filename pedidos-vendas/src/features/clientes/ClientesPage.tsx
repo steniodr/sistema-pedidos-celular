@@ -3,25 +3,45 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
 import { useDebounce } from "../../hooks/useDebounce";
-import { Button, LinkButton } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Field";
-import { BarraInferior, Cartao, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { Button } from "../../components/ui/Button";
+import { BarraInferior, BotaoCapa, Chips, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { LinhaLista, type AcentoLinha } from "../../components/ui/LinhaLista";
+import { Etiqueta } from "../../components/ui/Etiqueta";
+import { Esqueleto } from "../../components/ui/Esqueleto";
+import { IconeBases, IconeBuscar, IconeSomar } from "../../components/ui/icones";
+import capaCss from "../../components/ui/redesenho.module.css";
 import { mascararCpfCnpj } from "../../domain/cpfCnpj";
+import { definirParametro } from "../../domain/rotas";
 import { normalizar } from "../../domain/texto";
-import css from "./clientes.module.css";
 
 const ORDENS = ["Nome", "Recentes"] as const;
 type Ordem = (typeof ORDENS)[number];
 
-/** Cliente "Ativo" ou sem situação (cadastro manual) não mostra tag — só o que pede atenção. */
-function tagSituacao(situacao: string | undefined) {
+/**
+ * Cliente "Ativo" (ou sem situação, caso do cadastro manual) não ganha
+ * etiqueta — só o que pede atenção aparece.
+ */
+function etiquetaSituacao(situacao: string | undefined) {
   if (!situacao) return null;
   const alvo = normalizar(situacao);
   if (alvo.startsWith("ativo")) return null;
-  const variante = alvo.includes("inativo") ? "inativo" : "atencao";
   return (
-    <span className={`${css.tagSituacao} ${css[`tagSituacao--${variante}`]}`}>{situacao}</span>
+    <Etiqueta variante={alvo.includes("inativo") ? "erro" : "alerta"}>{situacao}</Etiqueta>
   );
+}
+
+function acentoSituacao(situacao: string | undefined): AcentoLinha | undefined {
+  if (!situacao) return undefined;
+  const alvo = normalizar(situacao);
+  if (alvo.startsWith("ativo")) return undefined;
+  return alvo.includes("inativo") ? "erro" : "alerta";
+}
+
+/** Duas letras do nome como âncora visual da linha (ex.: "Tintas do Vale" -> "TV"). */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter((p) => p.length > 1);
+  const letras = (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
+  return (letras || nome.slice(0, 2)).toUpperCase();
 }
 
 /**
@@ -52,8 +72,7 @@ export function ClientesPage() {
   }, [clientesBrutos, ordem]);
 
   function aoEscolher(id: string) {
-    const separador = retorno.includes("?") ? "&" : "?";
-    navigate(`${retorno}${separador}clienteId=${id}`, { replace: true });
+    navigate(definirParametro(retorno, "clienteId", id), { replace: true });
   }
 
   const destinoNovo = selecionando
@@ -63,80 +82,83 @@ export function ClientesPage() {
   return (
     <Tela
       titulo={selecionando ? "Escolher cliente" : "Clientes"}
+      subtitulo={
+        selecionando
+          ? "Toque no cliente do pedido"
+          : clientes
+            ? `${clientes.length} ${clientes.length === 1 ? "cadastrado" : "cadastrados"}`
+            : undefined
+      }
       voltar={true}
+      capa
       comBarraInferior
+      acao={
+        selecionando ? undefined : (
+          <BotaoCapa rotulo="Importar clientes" onClick={() => navigate("/clientes/importar")}>
+            <IconeBases size={19} />
+          </BotaoCapa>
+        )
+      }
+      abaixoDoTitulo={
+        <div className={capaCss.capaBusca}>
+          <span className={capaCss.capaBuscaIcone}>
+            <IconeBuscar size={16} />
+          </span>
+          <input
+            className={capaCss.capaBuscaCampo}
+            aria-label="Buscar"
+            placeholder="Nome, CPF/CNPJ ou código"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      }
     >
-      <Input
-        rotulo="Buscar"
-        placeholder="Nome, CPF/CNPJ ou código"
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        autoComplete="off"
-      />
-
-      {!selecionando && clientes && clientes.length > 1 && (
+      {!selecionando && (
         <Chips opcoes={ORDENS} valor={ordem} onChange={setOrdem} />
       )}
 
-      {clientes?.length === 0 ? (
+      {!clientes ? (
+        <Esqueleto linhas={4} />
+      ) : clientes.length === 0 ? (
         <EstadoVazio
           titulo={busca ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
-          descricao="Cadastre o primeiro cliente para começar."
+          descricao={
+            busca
+              ? "Tente outro nome, CPF/CNPJ ou código."
+              : "Cadastre o primeiro cliente para começar."
+          }
         />
       ) : (
         <div className="pilha">
-          {clientes?.map((cliente) =>
-            selecionando ? (
-              <Cartao key={cliente.id} onClick={() => aoEscolher(cliente.id)}>
-                <div className="texto-forte">{cliente.nome}</div>
-                <div className="texto-suave">
-                  {mascararCpfCnpj(cliente.cpfCnpj)}
-                  {cliente.cidadeEstado ? ` · ${cliente.cidadeEstado}` : ""}
-                </div>
-              </Cartao>
-            ) : (
-              <Cartao key={cliente.id}>
-                <div className={css.linhaCliente}>
-                  <div className={css.linhaClienteInfo}>
-                    <div className="texto-forte">
-                      {cliente.nome}
-                      {tagSituacao(cliente.situacao)}
-                    </div>
-                    <div className="texto-suave">
-                      {mascararCpfCnpj(cliente.cpfCnpj)}
-                      {cliente.cidadeEstado ? ` · ${cliente.cidadeEstado}` : ""}
-                    </div>
-                  </div>
-                  <Button
-                    variante="fantasma"
-                    className={css.botaoEditar}
-                    aria-label={`Editar ${cliente.nome}`}
-                    onClick={() => navigate(`/clientes/${cliente.id}`)}
-                  >
-                    ✎
-                  </Button>
-                </div>
-              </Cartao>
-            ),
-          )}
+          {clientes.map((cliente) => (
+            <LinhaLista
+              key={cliente.id}
+              iniciais={iniciaisDe(cliente.nome)}
+              acento={acentoSituacao(cliente.situacao)}
+              titulo={
+                <>
+                  {cliente.nome}
+                  {etiquetaSituacao(cliente.situacao)}
+                </>
+              }
+              meta={`${mascararCpfCnpj(cliente.cpfCnpj)}${
+                cliente.cidadeEstado ? ` · ${cliente.cidadeEstado}` : ""
+              }`}
+              onClick={() =>
+                selecionando ? aoEscolher(cliente.id) : navigate(`/clientes/${cliente.id}`)
+              }
+            />
+          ))}
         </div>
       )}
 
       <BarraInferior>
-        {selecionando ? (
-          <Button bloco onClick={() => navigate(destinoNovo)}>
-            Novo cliente
-          </Button>
-        ) : (
-          <div className={css.botoesRodape}>
-            <LinkButton to="/clientes/importar" variante="secundario" bloco>
-              Importar
-            </LinkButton>
-            <LinkButton to={destinoNovo} bloco>
-              Novo cliente
-            </LinkButton>
-          </div>
-        )}
+        <Button bloco onClick={() => navigate(destinoNovo)}>
+          <IconeSomar size={17} />
+          Novo cliente
+        </Button>
       </BarraInferior>
     </Tela>
   );

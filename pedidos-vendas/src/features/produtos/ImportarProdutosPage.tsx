@@ -3,7 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Field";
-import { BarraInferior, Cartao, Tela } from "../../components/ui/Layout";
+import { useConfirm } from "../../components/ui/Confirm";
+import { BarraInferior, Tela } from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { Passos } from "../../components/ui/Passos";
+import { Etiqueta } from "../../components/ui/Etiqueta";
+import {
+  IconeAtencao,
+  IconeLista,
+  IconeOk,
+  IconePlanilha,
+  IconeProduto,
+  IconeSeta,
+} from "../../components/ui/icones";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda } from "../../domain/calculos";
 import { mensagemErro } from "../../domain/erros";
@@ -34,9 +46,10 @@ export function ImportarProdutosPage() {
   const [planilha, setPlanilha] = useState<PlanilhaLida | null>(null);
   const [mapeamentoLista, setMapeamentoLista] = useState<MapeamentoLista | null>(null);
   const [colunasMatriz, setColunasMatriz] = useState<ColunasMatriz | null>(null);
-  const [colunasAbertas, setColunasAbertas] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [passoConferencia, setPassoConferencia] = useState(false);
+  const pedirConfirmacao = useConfirm();
 
   const resultado = useMemo(() => {
     if (!planilha) return null;
@@ -55,7 +68,7 @@ export function ImportarProdutosPage() {
       setColunasMatriz(lida.colunasMatriz);
       setNomeArquivo(arquivo.name);
       const cabecalhoNaoIdentificado = lida.linhaCabecalho === -1;
-      setColunasAbertas(cabecalhoNaoIdentificado);
+      setPassoConferencia(false);
       if (cabecalhoNaoIdentificado) {
         toast.info("Não identifiquei o cabeçalho. Confira as colunas abaixo.");
       }
@@ -84,6 +97,14 @@ export function ImportarProdutosPage() {
 
   async function confirmar() {
     if (!resultado || resultado.produtos.length === 0) return;
+    // Trocar a base e irreversivel e antes acontecia num toque so — excluir UM
+    // produto ja pedia confirmacao, o que deixava o risco invertido.
+    const ok = await pedirConfirmacao({
+      mensagem: `Substituir a base atual pelos ${resultado.produtos.length} produtos de "${nomeArquivo}"? Os produtos de hoje serão apagados e isso não pode ser desfeito.`,
+      textoConfirmar: "Substituir base",
+      perigo: true,
+    });
+    if (!ok) return;
     setConfirmando(true);
     try {
       const info = await repo.substituirBaseProdutos(resultado.produtos, nomeArquivo);
@@ -99,13 +120,31 @@ export function ImportarProdutosPage() {
   const colunas = planilha?.cabecalho ?? [];
   const prontoParaImportar = (resultado?.produtos.length ?? 0) > 0;
 
-  return (
-    <Tela titulo="Importar base de produtos" voltar={true} comBarraInferior>
-      <p className="texto-suave">
-        Selecione a tabela de preços (.xlsx, .xls ou .csv). A base atual será
-        substituída pelo conteúdo do arquivo.
-      </p>
+  // Passo derivado do estado: 0 escolher arquivo, 1 conferir colunas, 2 conferir
+  // resultado. Antes tudo isso aparecia de uma vez na mesma rolagem.
+  const passo = !planilha ? 0 : passoConferencia ? 2 : 1;
 
+  const rotulosMatriz: { campo: "produto" | "detalhes" | "categoria" | "variacao"; rotulo: string; obrigatorio?: boolean }[] = [
+    { campo: "produto", rotulo: "Produto", obrigatorio: true },
+    { campo: "detalhes", rotulo: "Detalhes do produto" },
+    { campo: "categoria", rotulo: "Categoria" },
+    { campo: "variacao", rotulo: "Variação (tamanho/tipo)" },
+  ];
+
+  function nomeColuna(indice: number | null | undefined): string | null {
+    if (indice === null || indice === undefined) return null;
+    return colunas[indice] || `Coluna ${indice + 1}`;
+  }
+
+  return (
+    <Tela
+      titulo="Importar produtos"
+      subtitulo={`Passo ${passo + 1} de 3 · ${["escolher arquivo", "conferir colunas", "conferir e substituir"][passo]}`}
+      voltar={true}
+      capa
+      comBarraInferior
+      abaixoDoTitulo={<Passos rotulos={["Arquivo", "Colunas", "Conferir"]} atual={passo} />}
+    >
       <input
         ref={inputArquivo}
         type="file"
@@ -116,122 +155,124 @@ export function ImportarProdutosPage() {
           e.target.value = "";
         }}
       />
-      <Button variante="secundario" bloco onClick={() => inputArquivo.current?.click()}>
-        {lendo ? "Lendo arquivo…" : nomeArquivo || "Escolher arquivo"}
-      </Button>
 
-      {planilha && planilha.formato === "matriz" && colunasMatriz && (
-        <>
-          <div className="linha linha--entre">
-            <h2 className="secao-titulo">Colunas identificadas</h2>
-            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
-              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
-            </Button>
-          </div>
+      {passo === 0 && (
+        <Painel titulo="Arquivo" icone={<IconePlanilha size={17} />}>
           <p className="texto-suave">
-            Formato de tabela de preços: uma linha por produto, uma coluna por
-            embalagem. {colunasMatriz.embalagens.length} colunas de embalagem
-            encontradas.
+            Tabela de preços em .xlsx, .xls ou .csv. Na última etapa você confere tudo antes de
+            substituir a base atual.
           </p>
-          {colunasAbertas && (
-            <>
-              <Select
-                rotulo="Produto"
-                obrigatorio
-                value={colunasMatriz.produto ?? ""}
-                onChange={(e) => ajustarColunaMatriz("produto", e.target.value)}
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                rotulo="Detalhes / variação"
-                ajuda="Combinado com o nome do produto (ex.: “Esmalte brilhante (branco)”)."
-                value={colunasMatriz.detalhes ?? ""}
-                onChange={(e) => ajustarColunaMatriz("detalhes", e.target.value)}
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                rotulo="Categoria"
-                ajuda="Usada só para identificar a coluna; não afeta o produto importado."
-                value={colunasMatriz.categoria ?? ""}
-                onChange={(e) => ajustarColunaMatriz("categoria", e.target.value)}
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                rotulo="Variação"
-                ajuda="Coluna à parte de Detalhes, para tamanho/tipo que não muda o preço (ex.: “#08”, “médio”) — some ao nome no Excel/PDF exportado."
-                value={colunasMatriz.variacao ?? ""}
-                onChange={(e) => ajustarColunaMatriz("variacao", e.target.value)}
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-            </>
-          )}
+          <Button
+            variante="secundario"
+            bloco
+            onClick={() => inputArquivo.current?.click()}
+            disabled={lendo}
+          >
+            {lendo ? "Lendo arquivo…" : "Escolher arquivo"}
+          </Button>
+        </Painel>
+      )}
+
+      {planilha && (
+        <div className={css.arquivoEscolhido}>
+          <span className={css.arquivoIcone}>
+            <IconePlanilha size={19} />
+          </span>
+          <span className={css.arquivoInfo}>
+            <span className={css.arquivoNome}>{nomeArquivo}</span>
+            <span className="texto-suave">
+              {planilha.formato === "matriz"
+                ? "Tabela de preços (uma coluna por embalagem)"
+                : "Lista (uma linha por produto)"}
+            </span>
+          </span>
+          <Button
+            variante="fantasma"
+            className={css.linkArquivo}
+            onClick={() => inputArquivo.current?.click()}
+          >
+            Trocar
+          </Button>
+        </div>
+      )}
+
+      {passo === 1 && (
+        <>
+          <Painel titulo="Colunas" icone={<IconeLista size={17} />}>
+            {/* "Coluna da planilha → vira campo" no lugar de uma pilha de selects
+                iguais: dá para conferir de relance o que foi reconhecido. */}
+            {planilha?.formato === "matriz"
+              ? rotulosMatriz.map(({ campo, rotulo, obrigatorio }) => {
+                  const atual = colunasMatriz?.[campo] ?? null;
+                  return (
+                    <div key={campo} className={css.mapa}>
+                      <Select
+                        rotulo={`Vira ${rotulo}`}
+                        obrigatorio={obrigatorio}
+                        value={atual === null ? "" : String(atual)}
+                        onChange={(e) => ajustarColunaMatriz(campo, e.target.value)}
+                      >
+                        <option value="">— não usar —</option>
+                        {colunas.map((nome, i) => (
+                          <option key={i} value={i}>
+                            {nome || `Coluna ${i + 1}`}
+                          </option>
+                        ))}
+                      </Select>
+                      {nomeColuna(atual) ? (
+                        <Etiqueta variante="sucesso">reconhecida</Etiqueta>
+                      ) : (
+                        <Etiqueta>vazia</Etiqueta>
+                      )}
+                    </div>
+                  );
+                })
+              : (Object.keys(ROTULOS_LISTA) as CampoLista[]).map((campo) => {
+                  const atual = mapeamentoLista?.[campo] ?? null;
+                  return (
+                    <div key={campo} className={css.mapa}>
+                      <Select
+                        rotulo={`Vira ${ROTULOS_LISTA[campo]}`}
+                        obrigatorio={campo !== "embalagem"}
+                        value={atual === null ? "" : String(atual)}
+                        onChange={(e) =>
+                          setMapeamentoLista({
+                            ...(mapeamentoLista as MapeamentoLista),
+                            [campo]: e.target.value === "" ? null : Number(e.target.value),
+                          })
+                        }
+                      >
+                        <option value="">— não usar —</option>
+                        {colunas.map((nome, i) => (
+                          <option key={i} value={i}>
+                            {nome || `Coluna ${i + 1}`}
+                          </option>
+                        ))}
+                      </Select>
+                      {nomeColuna(atual) ? (
+                        <Etiqueta variante="sucesso">reconhecida</Etiqueta>
+                      ) : (
+                        <Etiqueta>vazia</Etiqueta>
+                      )}
+                    </div>
+                  );
+                })}
+            {planilha?.formato === "matriz" && (
+              <p className="texto-suave">
+                {colunasMatriz?.embalagens.length ?? 0} colunas de embalagem encontradas.
+              </p>
+            )}
+          </Painel>
+
+          <p className={css.avisoLimite}>
+            No passo 3 você confere o resultado antes de substituir a base atual.
+          </p>
         </>
       )}
 
-      {planilha && planilha.formato === "lista" && mapeamentoLista && (
+      {passo === 2 && resultado && (
         <>
-          <div className="linha linha--entre">
-            <h2 className="secao-titulo">Colunas</h2>
-            <Button variante="fantasma" onClick={() => setColunasAbertas((v) => !v)}>
-              {colunasAbertas ? "Ocultar ▴" : "Ajustar ▾"}
-            </Button>
-          </div>
-          {!colunasAbertas && (
-            <p className="texto-suave">Colunas identificadas automaticamente.</p>
-          )}
-          {colunasAbertas &&
-            (Object.keys(ROTULOS_LISTA) as CampoLista[]).map((campo) => (
-              <Select
-                key={campo}
-                rotulo={ROTULOS_LISTA[campo]}
-                value={mapeamentoLista[campo] ?? ""}
-                obrigatorio={campo !== "embalagem"}
-                onChange={(e) =>
-                  setMapeamentoLista({
-                    ...mapeamentoLista,
-                    [campo]: e.target.value === "" ? null : Number(e.target.value),
-                  })
-                }
-              >
-                <option value="">— não usar —</option>
-                {colunas.map((nome, indice) => (
-                  <option key={indice} value={indice}>
-                    {nome || `Coluna ${indice + 1}`}
-                  </option>
-                ))}
-              </Select>
-            ))}
-        </>
-      )}
-
-      {planilha && resultado && (
-        <>
-          <h2 className="secao-titulo">Conferência</h2>
-          <Cartao>
+          <Painel titulo="Conferência" icone={<IconeOk size={17} />}>
             <div className={css.resumoImport}>
               <div className={css.resumoImportItem}>
                 <span className={css.resumoImportValor}>{resultado.produtos.length}</span>
@@ -242,57 +283,82 @@ export function ImportarProdutosPage() {
                 <span className="texto-suave">linhas com aviso</span>
               </div>
             </div>
-          </Cartao>
+          </Painel>
 
           {resultado.produtos.length > 0 && (
-            <div className={css.previaRolagem}>
-              <table className={css.previaTabela}>
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Embalagem</th>
-                    <th>Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resultado.produtos.slice(0, 10).map((p, i) => (
-                    <tr key={i}>
-                      <td>
-                        {p.categoria ? `${p.categoria} · ` : ""}
-                        {p.nome}
-                        {p.detalhes ? ` (${p.detalhes})` : ""}
-                        {p.variacao ? ` · ${p.variacao}` : ""}
-                      </td>
-                      <td>{p.embalagem}</td>
-                      <td>{formatarMoeda(p.valorUnit)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Painel titulo="Amostra" icone={<IconeProduto size={17} />}>
+              <div className="pilha pilha--apertada">
+                {resultado.produtos.slice(0, 10).map((p, i) => (
+                  <div key={i} className={css.amostraLinha}>
+                    <span className={css.amostraNome}>
+                      {[p.categoria, p.nome].filter(Boolean).join(" · ")}
+                      {p.detalhes ? ` (${p.detalhes})` : ""}
+                      {p.variacao ? ` · ${p.variacao}` : ""}
+                    </span>
+                    <span className="texto-suave">{p.embalagem}</span>
+                    <span className="texto-forte">{formatarMoeda(p.valorUnit)}</span>
+                  </div>
+                ))}
+              </div>
+              {/* O corte era silencioso: a tela mostrava 10 sem dizer de quantos. */}
+              {resultado.produtos.length > 10 && (
+                <p className="texto-suave">
+                  Mostrando 10 de {resultado.produtos.length}.
+                </p>
+              )}
+            </Painel>
           )}
 
           {resultado.ignorados.length > 0 && (
             <details className={css.detalhesAviso}>
               <summary>Ver linhas com aviso ({resultado.ignorados.length})</summary>
               <ul className="texto-suave">
-                {resultado.ignorados.slice(0, 30).map((ig, i) => (
+                {resultado.ignorados.slice(0, 30).map((linha, i) => (
                   <li key={i}>
-                    Linha {ig.linha}: {ig.motivo}
+                    Linha {linha.linha}: {linha.motivo}
                   </li>
                 ))}
               </ul>
+              {resultado.ignorados.length > 30 && (
+                <p className="texto-suave">
+                  Mostrando 30 de {resultado.ignorados.length}.
+                </p>
+              )}
             </details>
           )}
+
+          <div className={css.avisoSubstituir}>
+            <span className={css.avisoSubstituirIcone}>
+              <IconeAtencao size={17} />
+            </span>
+            <span>
+              Substituir troca a base inteira: os {resultado.produtos.length} produtos deste
+              arquivo passam a ser os únicos. Pedidos já feitos não mudam.
+            </span>
+          </div>
         </>
       )}
 
       <BarraInferior>
-        <Button bloco onClick={confirmar} disabled={!prontoParaImportar || confirmando}>
-          {confirmando
-            ? "Importando…"
-            : `Substituir base (${resultado?.produtos.length ?? 0})`}
-        </Button>
+        {passo === 2 ? (
+          <div className={css.botoesRodape}>
+            <Button variante="secundario" bloco onClick={() => setPassoConferencia(false)}>
+              Voltar
+            </Button>
+            <Button bloco disabled={!prontoParaImportar || confirmando} onClick={confirmar}>
+              {confirmando ? "Importando…" : `Substituir base (${resultado?.produtos.length ?? 0})`}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            bloco
+            disabled={passo === 0 || !prontoParaImportar}
+            onClick={() => setPassoConferencia(true)}
+          >
+            Conferir
+            <IconeSeta size={17} />
+          </Button>
+        )}
       </BarraInferior>
     </Tela>
   );

@@ -1,54 +1,267 @@
-.cabecalho {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+/* ---------- Capa da marca ---------- */
+.capa {
+  position: relative;
+  padding: 16px;
+  padding-top: calc(20px + var(--espaco-topo));
+  padding-bottom: 22px;
+  background: var(--cor-marca);
+  background-image: radial-gradient(
+    120% 90% at 88% -10%,
+    rgba(111, 161, 232, 0.38),
+    rgba(111, 161, 232, 0) 60%
+  );
+  color: var(--cor-marca-contraste);
+  border-radius: 0 0 22px 22px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+}
+
+.capaTopo {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 16px;
-  padding-top: calc(16px + var(--espaco-topo));
-  background: linear-gradient(135deg, #1c73b7, #12325c);
-  color: #fff;
+  gap: 10px;
 }
 
-.cabecalho h1 {
-  color: #fff;
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
 
-.botaoConfig {
-  color: #fff;
+.wordmark {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-weight: 700;
+  font-size: 1.3125rem;
+  letter-spacing: -0.01em;
+  color: var(--cor-marca-contraste);
 }
 
-.atalhos {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.rodape {
+.iconeBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 16px 0 8px;
+  width: var(--alvo-toque);
+  height: var(--alvo-toque);
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--raio);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cor-marca-contraste);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.iconeBtn:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.saudacao {
+  margin: 14px 0 2px;
+  font-family: var(--fonte-titulo);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.data {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.66);
+  text-transform: capitalize;
+}
+
+/* ---------- Conteúdo ---------- */
+.conteudo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  padding-bottom: calc(24px + var(--espaco-base));
+  margin-top: -14px;
+}
+
+.baseOk {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--cor-sucesso-fundo);
+  border: 1px solid #bbf7d0;
+  color: var(--cor-sucesso);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.baseOkPonto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cor-sucesso);
+}
+
+/* ---------- Herói ---------- */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--raio);
+  background: var(--cor-primaria);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(29, 78, 216, 0.28);
+  animation: surgir 320ms ease-out both;
+}
+
+.hero:active {
+  background: var(--cor-primaria-escura);
+}
+
+.heroIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: var(--raio-pequeno);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.heroTexto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.heroTitulo {
+  display: block;
+  font-family: var(--fonte-titulo);
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.heroSub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.heroSeta {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- Grade de azulejos ---------- */
+.grade {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+  color: var(--cor-texto);
+  text-decoration: none;
+  animation: surgir 320ms ease-out both;
+}
+
+.tile:active {
+  background: var(--cor-primaria-clara);
+}
+
+.tile:nth-child(1) {
+  animation-delay: 40ms;
+}
+.tile:nth-child(2) {
+  animation-delay: 80ms;
+}
+.tile:nth-child(3) {
+  animation-delay: 120ms;
+}
+.tile:nth-child(4) {
+  animation-delay: 160ms;
+}
+
+.tileIcone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria);
+}
+
+.tileRotulo {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+/* ---------- Pedidos recentes ---------- */
+.verTodos {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.recenteCartao {
+  position: relative;
+  overflow: hidden;
+  padding-left: 16px;
+  animation: surgir 320ms ease-out both;
+}
+
+.recenteAcento {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.recenteAcento--enviado {
+  background: var(--cor-sucesso);
+}
+
+.recenteAcento--rascunho {
+  background: var(--cor-alerta);
+}
+
+/* ---------- Rodapé ---------- */
+.rodape {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 2px;
+}
+
+.novidades {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 4px;
+  border: none;
+  background: none;
   color: var(--cor-texto-suave);
   font-size: 0.8125rem;
-}
-
-.botaoNovidades {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--cor-borda);
-  color: var(--cor-texto-suave);
-  font-size: 0.75rem;
-  line-height: 1;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -57,4 +270,23 @@
   padding-left: 18px;
   color: var(--cor-texto-suave);
   font-size: 0.9375rem;
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero,
+  .tile,
+  .recenteCartao {
+    animation: none !important;
+  }
 }

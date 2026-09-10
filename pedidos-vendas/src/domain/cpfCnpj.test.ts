@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mascararCpfCnpj, validarCNPJ, validarCPF, validarCpfCnpj } from "./cpfCnpj";
+import {
+  mascararCpfCnpj,
+  mascararTelefone,
+  validarCNPJ,
+  validarCPF,
+  validarCpfCnpj,
+} from "./cpfCnpj";
 
 describe("validarCPF", () => {
   it("aceita CPF válido com e sem máscara", () => {
@@ -64,5 +70,33 @@ describe("mascararCpfCnpj", () => {
 
   it("descarta dígitos além do CNPJ", () => {
     expect(mascararCpfCnpj("112223330001819999")).toBe("11.222.333/0001-81");
+  });
+});
+
+describe("mascararTelefone", () => {
+  it("formata celular (11 dígitos) com 5 dígitos antes do hífen", () => {
+    expect(mascararTelefone("11978319643")).toBe("(11) 97831-9643");
+  });
+
+  it("formata fixo (10 dígitos) com 4 dígitos antes do hífen", () => {
+    expect(mascararTelefone("1133334444")).toBe("(11) 3333-4444");
+  });
+
+  it("conserta um valor que ficou meio formatado enquanto o vendedor digitava", () => {
+    // Regressão do export: o formulário guardava o TEXTO exibido, e ao digitar
+    // o 11º número o texto ainda estava no formato de fixo — virava
+    // "(11) 9783-19643", que ia cru para o Excel/PDF.
+    expect(mascararTelefone("(11) 9783-19643")).toBe("(11) 97831-9643");
+  });
+
+  it("é idempotente: mascarar de novo não estraga", () => {
+    const uma = mascararTelefone("11978319643");
+    expect(mascararTelefone(uma)).toBe(uma);
+  });
+
+  it("aguenta valor parcial e vazio", () => {
+    expect(mascararTelefone("")).toBe("");
+    expect(mascararTelefone("11")).toBe("11");
+    expect(mascararTelefone("119")).toBe("(11) 9");
   });
 });

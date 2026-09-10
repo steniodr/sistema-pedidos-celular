@@ -263,3 +263,39 @@ describe("nomeArquivo", () => {
     expect(nomeArquivo(dados, "xlsx")).toBe("orcamento-ORC01-tintas-do-vale-ltda.xlsx");
   });
 });
+
+describe("telefone do representante na exportação", () => {
+  function pedidoCom(telefone: string): Pedido {
+    return pedidoComItem({
+      item: 1,
+      qtd: 1,
+      embalagem: "Galão",
+      descricaoProduto: "Produto",
+      valorUnit: 10,
+    }) as Pedido & { representanteTelefone?: string };
+  }
+
+  it("sai mascarado a partir dos dígitos guardados", () => {
+    const base = pedidoCom("");
+    const dados = montarDadosExportacao(
+      { ...base, representanteTelefone: "11978319643" },
+      cliente,
+    );
+    expect(dados.representante.telefone).toBe("(11) 97831-9643");
+  });
+
+  it("conserta o valor meio formatado que ficou gravado em cadastros antigos", () => {
+    const base = pedidoCom("");
+    const dados = montarDadosExportacao(
+      { ...base, representanteTelefone: "(11) 9783-19643" },
+      cliente,
+    );
+    expect(dados.representante.telefone).toBe("(11) 97831-9643");
+  });
+
+  it("telefone vazio continua vazio", () => {
+    const base = pedidoCom("");
+    const dados = montarDadosExportacao({ ...base, representanteTelefone: "" }, cliente);
+    expect(dados.representante.telefone).toBe("");
+  });
+});

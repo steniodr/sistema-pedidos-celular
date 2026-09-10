@@ -1,14 +1,27 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
 import { useDados } from "../../hooks/useDados";
-import { Button, LinkButton } from "../../components/ui/Button";
+import { Button } from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/Confirm";
-import { Cartao, Tela } from "../../components/ui/Layout";
+import { Tela } from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { LinhaLista } from "../../components/ui/LinhaLista";
+import { ZonaDeRisco } from "../../components/ui/ZonaDeRisco";
+import {
+  IconeBackup,
+  IconeBases,
+  IconeCliente,
+  IconeConfig,
+  IconeMarca,
+  IconeNovidades,
+  IconeProduto,
+  IconeTeste,
+} from "../../components/ui/icones";
+import { mascararTelefone } from "../../domain/cpfCnpj";
 import { useToast } from "../../components/ui/Toast";
 import { mensagemErro } from "../../domain/erros";
 import type { BackupDados } from "../../data/repository";
-import { semearClientesTeste } from "../clientes/clientesTeste";
-import { gerarPedidosTeste } from "../pedidos/pedidosTeste";
 import { avaliarBase, formatarDataHora } from "../produtos/statusBase";
 import { baixarArquivo } from "../export/dadosExportacao";
 import { verificarAtualizacoesAgora } from "../../pwa";
@@ -16,11 +29,9 @@ import { VERSAO_APP } from "../../versaoApp";
 
 export function ConfigPage() {
   const repo = useRepository();
+  const navigate = useNavigate();
   const toast = useToast();
   const confirmar = useConfirm();
-  const [semeando, setSemeando] = useState(false);
-  const [semeandoPedidos, setSemeandoPedidos] = useState(false);
-  const [removendoTeste, setRemovendoTeste] = useState(false);
   const [gerandoBackup, setGerandoBackup] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
   const [verificando, setVerificando] = useState(false);
@@ -29,55 +40,6 @@ export function ConfigPage() {
   const { dados: representante } = useDados(() => repo.obterRepresentante(), [repo]);
   const { dados: importacao } = useDados(() => repo.obterUltimaImportacao(), [repo]);
   const statusBase = avaliarBase(importacao);
-
-  async function criarClientesTeste() {
-    setSemeando(true);
-    try {
-      const criados = await semearClientesTeste(repo);
-      toast.sucesso(
-        criados > 0
-          ? `${criados} cliente(s) de teste criado(s).`
-          : "Os clientes de teste já existem.",
-      );
-    } catch (e) {
-      toast.erro(mensagemErro(e, "Não foi possível criar os clientes de teste."));
-    } finally {
-      setSemeando(false);
-    }
-  }
-
-  async function criarPedidosTeste() {
-    setSemeandoPedidos(true);
-    try {
-      const criados = await gerarPedidosTeste(repo);
-      toast.sucesso(`${criados} pedido(s) de teste criado(s) para validar os Relatórios.`);
-    } catch (e) {
-      toast.erro(mensagemErro(e, "Não foi possível criar os pedidos de teste."));
-    } finally {
-      setSemeandoPedidos(false);
-    }
-  }
-
-  async function removerDadosTeste() {
-    const ok = await confirmar({
-      mensagem:
-        "Remove todos os clientes e pedidos marcados como teste (criados pelos botões acima). Clientes e pedidos reais não são afetados. Continuar?",
-      textoConfirmar: "Remover",
-      perigo: true,
-    });
-    if (!ok) return;
-    setRemovendoTeste(true);
-    try {
-      const resultado = await repo.removerDadosTeste();
-      toast.sucesso(
-        `${resultado.clientes} cliente(s) e ${resultado.pedidos} pedido(s) de teste removidos.`,
-      );
-    } catch (e) {
-      toast.erro(mensagemErro(e, "Não foi possível remover os dados de teste."));
-    } finally {
-      setRemovendoTeste(false);
-    }
-  }
 
   async function baixarBackup() {
     setGerandoBackup(true);
@@ -134,55 +96,76 @@ export function ConfigPage() {
   }
 
   return (
-    <Tela titulo="Configurações" voltar="/">
-      <h2 className="secao-titulo">App</h2>
-      <p className="texto-suave">
-        Versão v{VERSAO_APP}. O app instalado na tela inicial às vezes demora
-        pra pegar uma atualização sozinho — use o botão abaixo pra forçar a
-        checagem agora, sem precisar apagar e reinstalar.
-      </p>
-      <Button variante="secundario" onClick={verificarAtualizacoes} disabled={verificando}>
-        {verificando ? "Verificando…" : "Verificar atualizações"}
-      </Button>
+    // Vira lista de configurações: cada item é uma linha com ícone, valor atual
+    // e seta. Antes eram sete botões "secundário" idênticos, sem distinguir
+    // navegação de ação nem o que era irreversível.
+    <Tela titulo="Configurações" subtitulo={`Versão ${VERSAO_APP}`} voltar="/" capa>
+      <Painel titulo="Seu cadastro" icone={<IconeCliente size={17} />}>
+        <LinhaLista
+          icone={<IconeCliente size={17} />}
+          titulo="Representante"
+          meta={
+            representante?.nome
+              ? [representante.nome, mascararTelefone(representante.telefone ?? ""), representante.email]
+                  .filter(Boolean)
+                  .join(" · ")
+              : "Nenhum representante cadastrado ainda"
+          }
+          onClick={() => navigate("/config/representante")}
+        />
+      </Painel>
 
-      <h2 className="secao-titulo">Representante</h2>
-      <p className="texto-suave">
-        Preenchido automaticamente no rodapé de todo pedido novo.
-      </p>
-      <Cartao>
-        <p className="texto-suave">
-          {representante?.nome
-            ? [representante.nome, representante.telefone, representante.email]
-                .filter(Boolean)
-                .join(" · ")
-            : "Nenhum representante cadastrado ainda."}
-        </p>
-      </Cartao>
-      <LinkButton to="/config/representante" variante="secundario">
-        Cadastrar representante
-      </LinkButton>
+      <Painel titulo="Dados" icone={<IconeBases size={17} />}>
+        <LinhaLista
+          icone={<IconeProduto size={17} />}
+          titulo="Base de produtos"
+          meta={
+            importacao
+              ? `${importacao.totalProdutos} produtos · ${formatarDataHora(importacao.quandoEm)}`
+              : "Nenhuma base importada ainda"
+          }
+          acento={statusBase.nivel === "ok" ? undefined : "alerta"}
+          onClick={() => navigate("/produtos/importar")}
+        />
+        <LinhaLista
+          icone={<IconeMarca size={17} />}
+          titulo="Marcas nos relatórios"
+          meta="Quais marcas entram nos totais e os grupos de marcas"
+          onClick={() => navigate("/config/marcas-relatorio")}
+        />
+        <LinhaLista
+          icone={<IconeBackup size={17} />}
+          titulo="Baixar backup (.json)"
+          meta={
+            gerandoBackup
+              ? "Gerando arquivo…"
+              : "Cópia de clientes, produtos e pedidos deste aparelho"
+          }
+          fim={<span />}
+          onClick={baixarBackup}
+        />
+      </Painel>
 
-      <h2 className="secao-titulo">Base de produtos</h2>
-      <Cartao>
-        <p className="texto-suave">
-          {importacao
-            ? `${importacao.totalProdutos} produtos · última importação em ${formatarDataHora(importacao.quandoEm)} (${statusBase.mensagem.toLowerCase()})`
-            : "Nenhuma base importada ainda."}
-        </p>
-      </Cartao>
-      <LinkButton to="/produtos/importar" variante="secundario">
-        Importar base de produtos
-      </LinkButton>
+      <Painel titulo="App" icone={<IconeConfig size={17} />}>
+        <LinhaLista
+          icone={<IconeNovidades size={17} />}
+          titulo="Verificar atualizações"
+          meta={
+            verificando
+              ? "Verificando…"
+              : "O app instalado às vezes demora pra pegar sozinho"
+          }
+          fim={<span />}
+          onClick={verificarAtualizacoes}
+        />
+        <LinhaLista
+          icone={<IconeTeste size={17} />}
+          titulo="Ambiente de teste"
+          meta="Dados fictícios para experimentar sem tocar nos reais"
+          onClick={() => navigate("/config/teste")}
+        />
+      </Painel>
 
-      <h2 className="secao-titulo">Backup</h2>
-      <p className="texto-suave">
-        Guarda uma cópia de clientes, produtos e pedidos deste aparelho num
-        arquivo .json — útil antes de trocar de celular (ainda não existe
-        sincronização automática entre vendedores).
-      </p>
-      <Button variante="secundario" onClick={baixarBackup} disabled={gerandoBackup}>
-        {gerandoBackup ? "Gerando…" : "Baixar backup (.json)"}
-      </Button>
       <input
         ref={inputBackup}
         type="file"
@@ -193,38 +176,19 @@ export function ConfigPage() {
           e.target.value = "";
         }}
       />
-      <Button
-        variante="secundario"
-        onClick={() => inputBackup.current?.click()}
-        disabled={restaurando}
-      >
-        {restaurando ? "Restaurando…" : "Restaurar backup"}
-      </Button>
 
-      <h2 className="secao-titulo">Dados de teste</h2>
-      <p className="texto-suave">
-        Cria 2 clientes de exemplo (“(teste)” no nome) para experimentar o app sem
-        digitar dados.
-      </p>
-      <Button variante="secundario" onClick={criarClientesTeste} disabled={semeando}>
-        {semeando ? "Criando…" : "Criar clientes de teste"}
-      </Button>
-      <p className="texto-suave">
-        Cria pedidos de exemplo espalhados em semanas/meses diferentes, com
-        marcas variadas, vinculados só aos clientes de teste acima — só para
-        validar a tela de Relatórios. Marcados como teste, então nunca entram
-        nos totais de vendas.
-      </p>
-      <Button variante="secundario" onClick={criarPedidosTeste} disabled={semeandoPedidos}>
-        {semeandoPedidos ? "Criando…" : "Criar pedidos de teste"}
-      </Button>
-      <p className="texto-suave">
-        Remove de uma vez todos os clientes e pedidos criados pelos dois
-        botões acima. Não afeta clientes/pedidos reais.
-      </p>
-      <Button variante="perigo" onClick={removerDadosTeste} disabled={removendoTeste}>
-        {removendoTeste ? "Removendo…" : "Remover dados de teste"}
-      </Button>
+      {/* Restaurar apaga TUDO deste aparelho — antes tinha exatamente a mesma
+          aparência do "Baixar backup", que não destrói nada. */}
+      <ZonaDeRisco descricao="Restaurar substitui todos os clientes, produtos e pedidos deste aparelho pelo conteúdo do arquivo.">
+        <Button
+          variante="perigo"
+          onClick={() => inputBackup.current?.click()}
+          disabled={restaurando}
+        >
+          <IconeBackup size={16} />
+          {restaurando ? "Restaurando…" : "Restaurar backup"}
+        </Button>
+      </ZonaDeRisco>
     </Tela>
   );
 }

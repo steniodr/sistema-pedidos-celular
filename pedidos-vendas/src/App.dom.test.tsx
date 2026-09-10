@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -30,12 +30,27 @@ function abrir(rota = "/") {
 }
 
 async function preencher(rotulo: RegExp, valor: string) {
-  const campo = screen.getByLabelText(rotulo);
+  // `find*` (não `get*`): logo depois de uma navegação o campo pode ainda não
+  // ter montado (a tela carrega o pedido via useDados) — espera aparecer.
+  const campo = await screen.findByLabelText(rotulo);
   await userEvent.clear(campo);
   await userEvent.type(campo, valor);
 }
 
+/**
+ * A barra de Finalizar tem uma acao so ("Exportar"), que abre a folha com
+ * Excel/PDF. Devolve o botao do Excel ja visivel.
+ */
+async function abrirExportacao() {
+  await userEvent.click(await screen.findByRole("button", { name: "Exportar" }));
+  return await screen.findByRole("button", { name: /Exportar Excel/ });
+}
+
 beforeEach(async () => {
+  // Deixa consultas em voo de telas recém-desmontadas (useDados) resolverem
+  // antes de fechar o banco — senão o Dexie emite um "DatabaseClosedError"
+  // não tratado que a suíte contabiliza como falha em outro teste.
+  await new Promise((resolve) => setTimeout(resolve, 0));
   await db.delete();
   await db.open();
 });
@@ -91,12 +106,17 @@ describe("fluxo do pedido", () => {
     });
     const [cliente] = await dexieRepository.listarClientes();
 
+    const marca = await dexieRepository.salvarMarca({
+      nome: "ARARA AZUL",
+      visivelEmRelatorios: true,
+    });
+
     // Novo pedido já com o cliente escolhido, como volta da tela de seleção.
-    abrir(`/pedidos/novo?clienteId=${cliente.id}&marca=ARARA%20AZUL`);
+    abrir(`/pedidos/novo?clienteId=${cliente.id}&marcaId=${marca.id}`);
     expect(await screen.findByText("Tintas do Vale")).toBeDefined();
     await userEvent.click(await screen.findByRole("button", { name: "Iniciar pedido" }));
 
-    const item = await screen.findByRole("button", { name: "+ Adicionar item" });
+    const item = await screen.findByRole("button", { name: "Adicionar item" });
     await userEvent.click(item);
 
     // Busca só pelo nome do produto; a embalagem aparece como chip na etapa seguinte.
@@ -108,7 +128,8 @@ describe("fluxo do pedido", () => {
     await userEvent.click(chipGalao);
 
     await preencher(/^Quantidade/, "10");
-    expect(await screen.findByText("R$ 956,40")).toBeDefined();
+    // Aparece na conta do painel e no total da barra inferior.
+    expect((await screen.findAllByText("R$ 956,40")).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
 
@@ -174,11 +195,12 @@ describe("fluxo do pedido", () => {
 
     // Escolhida a variante: campo de leitura com o detalhe e chip de embalagem
     // com o preço certo daquela variante (118,80, não 95,64 da outra).
-    expect(await screen.findByDisplayValue("amarelo, laranja e vermelho")).toBeDefined();
+    // A variante escolhida vira etiqueta de resumo (antes era um campo readOnly).
+    expect(await screen.findByText("amarelo, laranja e vermelho")).toBeDefined();
     const chipGalao = await screen.findByRole("button", { name: "Galão (3,6 L)" });
     await userEvent.click(chipGalao);
     await preencher(/^Quantidade/, "2");
-    expect(await screen.findByText("R$ 237,60")).toBeDefined();
+    expect((await screen.findAllByText("R$ 237,60")).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
 
@@ -318,11 +340,11 @@ describe("fluxo do pedido", () => {
     abrir(`/pedidos/${pedido.id}/finalizar`);
     expect(await screen.findByText(/CPF\/CNPJ do cliente é inválido/)).toBeDefined();
 
-    const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
+    const botao = await screen.findByRole("button", { name: "Exportar" });
     expect(botao.hasAttribute("disabled")).toBe(true);
   });
 
-  it("bloqueia a exportação quando o número do pedido é limpo (zero/inválido)", async () => {
+  it("número do pedido limpo bloqueia exportar arquivo, mas ainda deixa salvar como orçamento", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Válido",
       cpfCnpj: "11222333000181",
@@ -340,10 +362,23 @@ describe("fluxo do pedido", () => {
     // userEvent.type não aceita string vazia — só limpar já dispara o onChange
     // com o campo em branco, que é o caso que queremos testar.
     await userEvent.clear(screen.getByLabelText(/^Número do pedido/));
-
     expect(await screen.findByText("O número do pedido é obrigatório.")).toBeDefined();
-    const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
-    expect(botao.hasAttribute("disabled")).toBe(true);
+
+    // A folha abre (número inválido não trava o caminho de orçamento)...
+    await userEvent.click(await screen.findByRole("button", { name: "Exportar" }));
+    // ...mas gerar arquivo continua bloqueado.
+    expect(
+      (await screen.findByRole("button", { name: /Exportar Excel/ })).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByRole("button", { name: /Exportar PDF/ }).hasAttribute("disabled"),
+    ).toBe(true);
+    // Salvar como orçamento segue disponível — ele descarta o número.
+    expect(
+      screen
+        .getByRole("button", { name: "Salvar como orçamento e voltar" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("permite exportar mesmo sem CPF/CNPJ do cliente (documento é opcional, ex.: orçamento)", async () => {
@@ -363,7 +398,7 @@ describe("fluxo do pedido", () => {
     });
 
     abrir(`/pedidos/${pedido.id}/finalizar`);
-    const botao = await screen.findByRole("button", { name: /Exportar Excel/ });
+    const botao = await screen.findByRole("button", { name: "Exportar" });
     expect(screen.queryByText(/CPF\/CNPJ do cliente é inválido/)).toBeNull();
     expect(botao.hasAttribute("disabled")).toBe(false);
   });
@@ -382,7 +417,7 @@ describe("fluxo do pedido", () => {
     });
 
     abrir(`/pedidos/${pedido.id}/finalizar`);
-    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
+    const botaoExcel = await abrirExportacao();
     expect(botaoExcel.hasAttribute("disabled")).toBe(false);
 
     await userEvent.click(botaoExcel);
@@ -419,7 +454,7 @@ describe("fluxo do pedido", () => {
     });
 
     abrir(`/pedidos/${pedido.id}/finalizar`);
-    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
+    const botaoExcel = await abrirExportacao();
     await userEvent.click(botaoExcel);
 
     // Sheet de confirmação (base crítica) aparece — cancela.
@@ -455,7 +490,7 @@ describe("fluxo do pedido", () => {
 
     // De volta ao pedido (mesma navegação da tela, sem remontar) — adiciona um
     // segundo item, normal (sujeito ao desconto geral).
-    await userEvent.click(await screen.findByRole("button", { name: "+ Adicionar item" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Adicionar item" }));
     await preencher(/^Produto/, "Esmalte");
     await userEvent.click(await screen.findByText("Usar “Esmalte”"));
     await preencher(/^Embalagem/, "Lata");
@@ -566,7 +601,7 @@ describe("fluxo do pedido", () => {
     expect(await screen.findByText("R$ 1.450,00")).toBeDefined();
   });
 
-  it("Somente orçamento: dispensa o número do pedido, usa um código ORC e não bloqueia exportar", async () => {
+  it("Salvar como orçamento: confere o código na folha, salva como enviado e volta pra inicial", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Teste",
       cpfCnpj: "11222333000181",
@@ -581,43 +616,26 @@ describe("fluxo do pedido", () => {
     await screen.findByRole("heading", { name: "Finalizar pedido" });
     expect(screen.getByLabelText(/^Número do pedido/)).toBeDefined();
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "Somente orçamento" }));
+    // Abre a folha de exportar e escolhe "Salvar como orçamento".
+    await userEvent.click(await screen.findByRole("button", { name: "Exportar" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Salvar como orçamento e voltar" }),
+    );
 
-    // Campo de número some, entra o código do orçamento (somente leitura).
-    expect(screen.queryByLabelText(/^Número do pedido/)).toBeNull();
-    const campoCodigo = (await screen.findByLabelText(/Código do orçamento/)) as HTMLInputElement;
-    expect(campoCodigo.value).toBe("ORC01");
-    expect(campoCodigo).toHaveProperty("disabled", true);
-    expect(await screen.findByText("Orçamento ORC01")).toBeDefined();
+    // Card de conferência: mostra o próximo código disponível antes de confirmar.
+    expect(await screen.findByText("Código do orçamento")).toBeDefined();
+    expect(screen.getByText("ORC01")).toBeDefined();
+    await userEvent.click(screen.getByRole("button", { name: /Confirmar orçamento ORC01/ }));
 
-    // Exporta normalmente — não é bloqueado por falta de número de pedido.
-    const botaoExcel = await screen.findByRole("button", { name: /Exportar Excel/ });
-    expect(botaoExcel.hasAttribute("disabled")).toBe(false);
-    expect(screen.queryByText("O número do pedido é obrigatório.")).toBeNull();
-
-    await waitFor(async () => {
-      const salvo = await dexieRepository.obterPedido(pedido.id);
-      expect(salvo?.somenteOrcamento).toBe(true);
-      expect(salvo?.codigoOrcamento).toBe("ORC01");
-    });
-
-    // Desmarca — volta a pedir número, com o próximo disponível já sugerido.
-    // Esse pedido é o único na base, então o "próximo disponível" (excluindo
-    // ele mesmo do cálculo) é o número que ele já tinha antes: 1.
-    await userEvent.click(screen.getByRole("checkbox", { name: "Somente orçamento" }));
-    expect(screen.queryByLabelText(/Código do orçamento/)).toBeNull();
-    const campoNumero = (await screen.findByLabelText(/^Número do pedido/)) as HTMLInputElement;
-    await waitFor(() => expect(campoNumero.value).toBe("1"));
-
-    const salvoFinal = await dexieRepository.obterPedido(pedido.id);
-    expect(salvoFinal?.somenteOrcamento).toBe(false);
-    expect(salvoFinal?.numero).toBe(1);
+    // Volta pra tela inicial e grava como orçamento já enviado.
+    await screen.findByRole("heading", { name: "Pedidos" });
+    const salvo = await dexieRepository.obterPedido(pedido.id);
+    expect(salvo?.somenteOrcamento).toBe(true);
+    expect(salvo?.codigoOrcamento).toBe("ORC01");
+    expect(salvo?.status).toBe("enviado");
   });
 
-  it("Somente orçamento: marcar e desmarcar várias vezes não fica subindo o número sem motivo", async () => {
-    // Regressão: proximoNumeroPedido() contava o próprio pedido (ainda com o
-    // número antigo gravado) como "já existente", então cada ida-e-volta sem
-    // nenhum pedido novo criado subia o número — 1, depois 2, depois 3...
+  it("Orçamento salvo: reabre sem pendência de número, exporta, e converte de volta em pedido", async () => {
     const cliente = await dexieRepository.salvarCliente({
       nome: "Cliente Teste",
       cpfCnpj: "11222333000181",
@@ -625,22 +643,34 @@ describe("fluxo do pedido", () => {
     const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
     await dexieRepository.salvarPedido({
       ...pedido,
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+      status: "enviado",
       itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
     });
 
     abrir(`/pedidos/${pedido.id}/finalizar`);
     await screen.findByRole("heading", { name: "Finalizar pedido" });
-    const checkbox = screen.getByRole("checkbox", { name: "Somente orçamento" });
 
-    for (let volta = 0; volta < 3; volta++) {
-      await userEvent.click(checkbox); // marca (orçamento)
-      await screen.findByLabelText(/Código do orçamento/);
-      await userEvent.click(checkbox); // desmarca (volta a ser pedido)
-      const campoNumero = (await screen.findByLabelText(/^Número do pedido/)) as HTMLInputElement;
-      await waitFor(() => expect(campoNumero.value).toBe("1"));
-    }
+    // Código no lugar do número, somente leitura — e sem pendência de número.
+    const campoCodigo = (await screen.findByLabelText(/Código do orçamento/)) as HTMLInputElement;
+    expect(campoCodigo.value).toBe("ORC01");
+    expect(campoCodigo).toHaveProperty("disabled", true);
+    expect(screen.queryByLabelText(/^Número do pedido/)).toBeNull();
+    expect(screen.queryByText(/pendência/)).toBeNull();
+
+    // Exportar não fica bloqueado por falta de número.
+    expect(screen.getByRole("button", { name: "Exportar" }).hasAttribute("disabled")).toBe(false);
+
+    // "Converter em pedido": some o código, volta o número — o próximo
+    // disponível excluindo ele mesmo do cálculo é 1 (o que ele já tinha).
+    await userEvent.click(screen.getByRole("button", { name: /Converter em pedido/ }));
+    expect(screen.queryByLabelText(/Código do orçamento/)).toBeNull();
+    const campoNumero = (await screen.findByLabelText(/^Número do pedido/)) as HTMLInputElement;
+    await waitFor(() => expect(campoNumero.value).toBe("1"));
 
     const salvoFinal = await dexieRepository.obterPedido(pedido.id);
+    expect(salvoFinal?.somenteOrcamento).toBe(false);
     expect(salvoFinal?.numero).toBe(1);
   });
 
@@ -653,19 +683,28 @@ describe("fluxo do pedido", () => {
       nome: "Cliente B",
       cpfCnpj: "52998224725",
     });
-    const pedido = await dexieRepository.criarPedido({ clienteId: clienteA.id, marca: "MERKO" });
+    const marcaMerko = await dexieRepository.salvarMarca({
+      nome: "MERKO",
+      visivelEmRelatorios: true,
+    });
+    await dexieRepository.salvarMarca({ nome: "ARARA AZUL", visivelEmRelatorios: true });
+    const pedido = await dexieRepository.criarPedido({
+      clienteId: clienteA.id,
+      marca: marcaMerko.nome,
+      marcaId: marcaMerko.id,
+    });
 
     abrir(`/pedidos/${pedido.id}`);
     await screen.findByText("Cliente A");
     expect(screen.getByText("MERKO")).toBeDefined();
     expect(screen.queryByLabelText(/^Marca/)).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Editar cliente ou marca" }));
+    // A linha de cliente/marca inteira abre a edicao (antes era so o glifo "✎").
+    await userEvent.click(screen.getByRole("button", { name: /Cliente A/ }));
 
-    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLInputElement;
-    expect(campoMarca.value).toBe("MERKO");
-    await userEvent.clear(campoMarca);
-    await userEvent.type(campoMarca, "ARARA AZUL");
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLSelectElement;
+    expect(campoMarca.value).toBe(marcaMerko.id);
+    await userEvent.selectOptions(campoMarca, "ARARA AZUL");
     await waitFor(async () => {
       expect((await dexieRepository.obterPedido(pedido.id))?.marca).toBe("ARARA AZUL");
     });
@@ -681,7 +720,11 @@ describe("fluxo do pedido", () => {
     await waitFor(() => expect(screen.getByText("Cliente B")).toBeDefined());
     expect(screen.queryByText("Cliente A")).toBeNull();
     expect(screen.getByText("ARARA AZUL")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Editar cliente ou marca" })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Cliente B/ })).toBeDefined();
+
+    // Excluir saiu do meio da tela e vive no menu de acoes da capa.
+    await userEvent.click(screen.getByRole("button", { name: "Mais ações do pedido" }));
+    expect(await screen.findByRole("button", { name: "Excluir pedido" })).toBeDefined();
     await waitFor(async () => {
       expect((await dexieRepository.obterPedido(pedido.id))?.clienteId).toBe(clienteB.id);
     });
@@ -701,22 +744,76 @@ describe("histórico", () => {
     await dexieRepository.salvarPedido({ ...pedido, status: "enviado" });
 
     abrir("/pedidos");
-    expect(await screen.findByText("Pedido nº 1")).toBeDefined();
+    // A linha agora traz o cliente em primeiro plano; o numero vira apoio.
+    expect(await screen.findByText("Cliente Teste")).toBeDefined();
 
-    await userEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Filtros" }));
     await userEvent.click(screen.getByRole("button", { name: "Rascunhos" }));
     expect(await screen.findByText("Nenhum pedido neste filtro")).toBeDefined();
 
-    await userEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Filtros" }));
     await userEvent.click(screen.getByRole("button", { name: "Todos" }));
-    const cartao = (await screen.findByText("Pedido nº 1")).closest("div")!;
-    await userEvent.click(within(cartao.parentElement!).getByRole("button", { name: "Duplicar" }));
+
+    // Duplicar/Reenviar sairam do cartao e vivem no menu "..." da linha.
+    await userEvent.click(await screen.findByRole("button", { name: "Ações do pedido nº 1" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Duplicar" }));
 
     await waitFor(async () => {
       expect((await dexieRepository.listarPedidos()).length).toBe(2);
     });
     const numeros = (await dexieRepository.listarPedidos()).map((p) => p.numero);
     expect(numeros).toEqual([2, 1]);
+  });
+
+  it("o total do topo não conta orçamento (que continua listado)", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    const real = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...real,
+      status: "enviado",
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+    });
+    const orcamento = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...orcamento,
+      status: "enviado",
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+      itens: [{ item: 1, qtd: 1, embalagem: "Balde", descricaoProduto: "Textura", valorUnit: 900 }],
+    });
+
+    abrir("/pedidos");
+    // Espera a lista carregar (o orçamento continua listado).
+    expect(await screen.findByText(/ORC01/)).toBeDefined();
+    const topo = (await screen.findByText("no filtro")).parentElement!;
+    // Só o pedido real (R$ 100) entra no total; o orçamento de R$ 900 não.
+    expect(await within(topo).findByText("R$ 100,00")).toBeDefined();
+    expect(screen.queryByText("R$ 1.000,00")).toBeNull();
+  });
+
+  it('orçamento enviado aparece como "Orçado", não como "Enviado" verde', async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    const orcamento = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...orcamento,
+      status: "enviado",
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+      itens: [{ item: 1, qtd: 1, embalagem: "Balde", descricaoProduto: "Textura", valorUnit: 900 }],
+    });
+    const real = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({ ...real, status: "enviado" });
+
+    abrir("/pedidos");
+    expect(await screen.findByText("Orçado")).toBeDefined();
+    // "Enviado" fica só com o pedido de verdade.
+    expect(screen.getAllByText("Enviado")).toHaveLength(1);
   });
 });
 
@@ -757,12 +854,662 @@ describe("relatórios", () => {
     expect(screen.queryByText("R$ 5.100,00")).toBeNull();
     expect(screen.queryByText(/Verniz/)).toBeNull();
   });
+
+  it('orçamento fica fora das vendas reais e tem o seu próprio recorte "Orçados"', async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+
+    const real = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...real,
+      status: "enviado",
+      itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 }],
+    });
+
+    // Orçamento também exportado (status enviado) — R$ 900.
+    const orcamento = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...orcamento,
+      status: "enviado",
+      somenteOrcamento: true,
+      codigoOrcamento: "ORC01",
+      itens: [{ item: 1, qtd: 1, embalagem: "Balde", descricaoProduto: "Textura", valorUnit: 900 }],
+    });
+
+    abrir("/relatorios");
+    // "Reais" (padrão): só os R$ 100 do pedido de verdade.
+    let rotulo = await screen.findByText("Total vendido");
+    expect(within(rotulo.parentElement!).getByText("R$ 100,00")).toBeDefined();
+    expect(screen.queryByText("R$ 1.000,00")).toBeNull();
+    expect(screen.queryByText(/Textura/)).toBeNull();
+
+    // Recorte "Orçados": agora só os R$ 900 do orçamento.
+    await userEvent.click(screen.getByRole("button", { name: "Orçados" }));
+    rotulo = await screen.findByText("Total vendido");
+    expect(await within(rotulo.parentElement!).findByText("R$ 900,00")).toBeDefined();
+    expect(screen.queryByText("R$ 100,00")).toBeNull();
+  });
+
+  it("marca desligada some dos totais reais, mesmo em 'Tudo'", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    const visivel = await dexieRepository.salvarMarca({
+      nome: "MERKO",
+      visivelEmRelatorios: true,
+    });
+    const oculta = await dexieRepository.salvarMarca({
+      nome: "ARARA AZUL",
+      visivelEmRelatorios: false,
+    });
+    for (const [m, valor] of [
+      [visivel, 100],
+      [oculta, 7000],
+    ] as const) {
+      const p = await dexieRepository.criarPedido({
+        clienteId: cliente.id,
+        marca: m.nome,
+        marcaId: m.id,
+      });
+      await dexieRepository.salvarPedido({
+        ...p,
+        status: "enviado",
+        itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Item", valorUnit: valor }],
+      });
+    }
+
+    abrir("/relatorios");
+    await userEvent.click(await screen.findByRole("button", { name: "Tudo" }));
+    const rotulo = await screen.findByText("Total vendido");
+    expect(within(rotulo.parentElement!).getByText("R$ 100,00")).toBeDefined();
+    expect(screen.queryByText("R$ 7.100,00")).toBeNull();
+  });
+
+  it("as setas de mês trocam os valores; comparar dois meses soma", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    await dexieRepository.salvarMarca({ nome: "MERKO", visivelEmRelatorios: true });
+
+    const hoje = new Date();
+    const esteMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-15`;
+    const mesPassadoDate = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 15);
+    const mesPassado = `${mesPassadoDate.getFullYear()}-${String(
+      mesPassadoDate.getMonth() + 1,
+    ).padStart(2, "0")}-15`;
+
+    for (const [data, valor] of [
+      [esteMes, 100],
+      [mesPassado, 900],
+    ] as const) {
+      const p = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+      await dexieRepository.salvarPedido({
+        ...p,
+        status: "enviado",
+        dataPedido: data,
+        itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Item", valorUnit: valor }],
+      });
+    }
+
+    abrir("/relatorios");
+    const rotulo = await screen.findByText("Total vendido");
+    // Mês atual: só o pedido de 100.
+    expect(await within(rotulo.parentElement!).findByText("R$ 100,00")).toBeDefined();
+
+    // Seta "‹" → mês anterior: agora aparece o de 900.
+    await userEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
+    expect(await within(rotulo.parentElement!).findByText("R$ 900,00")).toBeDefined();
+
+    // Seta "›" volta pro mês atual: de novo 100.
+    await userEvent.click(screen.getByRole("button", { name: "Próximo mês" }));
+    expect(await within(rotulo.parentElement!).findByText("R$ 100,00")).toBeDefined();
+
+    // "+ Comparar com mês anterior" → soma os dois: 1.000.
+    await userEvent.click(screen.getByRole("button", { name: /Comparar com m[êe]s anterior/ }));
+    expect(await within(rotulo.parentElement!).findByText("R$ 1.000,00")).toBeDefined();
+  });
+
+  it("Relatório de teste mostra os dados fictícios; o relatório real não, nem em 'Tudo'", async () => {
+    const { gerarRelatorioTeste } = await import("./features/relatorios/relatoriosTeste");
+    await gerarRelatorioTeste(dexieRepository);
+
+    // Rota direta: já abre no modo teste, com "Tudo" por padrão e dados na tela.
+    abrir("/relatorios/teste");
+    expect(await screen.findByText(/dados fictícios/i)).toBeDefined();
+    expect(await screen.findByText("Total vendido")).toBeDefined();
+    expect(await screen.findAllByText(/Teste [123]/)).not.toHaveLength(0);
+    cleanup();
+
+    // Tela normal: começa em "Reais" (sem dados reais → vazio), e o seletor
+    // "Teste" aparece porque há dados de teste na base.
+    abrir("/relatorios");
+    await userEvent.click(await screen.findByRole("button", { name: "Tudo" }));
+    expect(await screen.findByText("Nenhum pedido enviado neste filtro")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: "Teste" }));
+    expect(await screen.findByText(/dados fictícios/i)).toBeDefined();
+    expect(await screen.findByText("Total vendido")).toBeDefined();
+    expect(await screen.findAllByText(/Teste [123]/)).not.toHaveLength(0);
+  });
+});
+
+describe("seleção de cliente e marca (ida e volta pela query string)", () => {
+  it("escolher cliente no seletor volta com o cliente aplicado e a marca preservada", async () => {
+    const marca = await dexieRepository.salvarMarca({
+      nome: "MERKO",
+      visivelEmRelatorios: true,
+    });
+    await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+    });
+
+    // Entra em Novo pedido já com a marca escolhida e SEM cliente — é o estado
+    // em que o vendedor toca em "Escolher cliente".
+    abrir(`/pedidos/novo?marcaId=${marca.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "Escolher cliente" }));
+
+    await screen.findByRole("heading", { name: "Escolher cliente" });
+    await userEvent.click(await screen.findByText("Tintas do Vale"));
+
+    // Regressão: a rota de retorno já carregava "clienteId=" vazio e o seletor
+    // acrescentava outro, então params.get() devolvia o vazio e o cliente nunca
+    // era aplicado — travando o fluxo inteiro.
+    await screen.findByRole("heading", { name: "Novo pedido" });
+    expect(await screen.findByText("Tintas do Vale")).toBeDefined();
+
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLSelectElement;
+    expect(campoMarca.value).toBe(marca.id);
+
+    const iniciar = await screen.findByRole("button", { name: "Iniciar pedido" });
+    expect(iniciar.hasAttribute("disabled")).toBe(false);
+    await userEvent.click(iniciar);
+
+    await waitFor(async () => {
+      const [pedido] = await dexieRepository.listarPedidos();
+      expect(pedido?.marca).toBe("MERKO");
+      expect(pedido?.clienteId).toBeTruthy();
+    });
+  });
+
+  it("cadastrar marca no meio do fluxo volta com a marca aplicada e o cliente preservado", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Casa da Tinta",
+      cpfCnpj: "52998224725",
+    });
+
+    abrir(`/pedidos/novo?clienteId=${cliente.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: /Cadastrar nova marca/ }));
+
+    await screen.findByRole("heading", { name: "Nova marca" });
+    await preencher(/Nome da marca/, "ARARA AZUL");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar marca" }));
+
+    // Volta pro pedido com a marca nova já selecionada e o cliente intacto.
+    await screen.findByRole("heading", { name: "Novo pedido" });
+    expect(await screen.findByText("Casa da Tinta")).toBeDefined();
+    await screen.findByRole("option", { name: "ARARA AZUL" });
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLSelectElement;
+    await waitFor(() => expect(campoMarca.value).not.toBe(""));
+
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar pedido" }));
+    await waitFor(async () => {
+      const [pedido] = await dexieRepository.listarPedidos();
+      expect(pedido?.marca).toBe("ARARA AZUL");
+      expect(pedido?.clienteId).toBe(cliente.id);
+    });
+  });
+
+  it("trocar o cliente de um pedido já criado aplica o novo cliente", async () => {
+    const a = await dexieRepository.salvarCliente({ nome: "Cliente A", cpfCnpj: "11222333000181" });
+    const b = await dexieRepository.salvarCliente({ nome: "Cliente B", cpfCnpj: "52998224725" });
+    const marca = await dexieRepository.salvarMarca({ nome: "MERKO", visivelEmRelatorios: true });
+    const pedido = await dexieRepository.criarPedido({
+      clienteId: a.id,
+      marca: marca.nome,
+      marcaId: marca.id,
+    });
+
+    abrir(`/pedidos/${pedido.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: /Cliente A/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Trocar cliente" }));
+    await screen.findByRole("heading", { name: "Escolher cliente" });
+    await userEvent.click(await screen.findByText("Cliente B"));
+
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.clienteId).toBe(b.id);
+    });
+  });
+});
+
+describe("redesenho — comportamentos novos", () => {
+  async function pedidoComItem() {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+    });
+    const marca = await dexieRepository.salvarMarca({
+      nome: "MERKO",
+      visivelEmRelatorios: true,
+    });
+    const pedido = await dexieRepository.criarPedido({
+      clienteId: cliente.id,
+      marca: marca.nome,
+      marcaId: marca.id,
+    });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        {
+          item: 1,
+          qtd: 2,
+          embalagem: "Galão",
+          descricaoProduto: "Esmalte sintético",
+          nomeProduto: "Esmalte sintético",
+          valorUnit: 100,
+        },
+      ],
+    });
+    return { pedido, cliente };
+  }
+
+  it("remover um item do pedido agora pede confirmação (antes excluía direto)", async () => {
+    const { pedido } = await pedidoComItem();
+
+    abrir(`/pedidos/${pedido.id}/item/0`);
+    await screen.findByRole("heading", { name: "Editar item" });
+    await userEvent.click(await screen.findByRole("button", { name: "Remover item" }));
+
+    await screen.findByText(/Remover .* do pedido\?/);
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect((await dexieRepository.obterPedido(pedido.id))?.itens).toHaveLength(1);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remover item" }));
+    await screen.findByText(/Remover .* do pedido\?/);
+    await userEvent.click(screen.getByRole("button", { name: "Remover" }));
+
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.itens).toHaveLength(0);
+    });
+  });
+
+  it("no item, quantidade e valor lado a lado calculam o total e o painel opcional guarda os campos", async () => {
+    const { pedido } = await pedidoComItem();
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    await preencher(/^Produto/, "Verniz");
+    await userEvent.click(await screen.findByText(/Usar/));
+    await preencher(/^Embalagem/, "Lata");
+    await preencher(/^Quantidade/, "3");
+    await preencher(/Valor unitário/, "50");
+
+    // A conta aparece no painel e o total na barra — mesmo valor nos dois.
+    await waitFor(async () => {
+      expect((await screen.findAllByText("R$ 150,00")).length).toBeGreaterThan(1);
+    });
+
+    // Painel "Detalhes opcionais" começa fechado; abrir mantém o que foi digitado.
+    expect(screen.queryByLabelText(/^Cor/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Detalhes opcionais/ }));
+    await preencher(/^Cor/, "Branco neve");
+    await userEvent.click(screen.getByRole("button", { name: /Detalhes opcionais/ }));
+    expect(screen.queryByLabelText(/^Cor/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Detalhes opcionais/ }));
+    expect(((await screen.findByLabelText(/^Cor/)) as HTMLInputElement).value).toBe("Branco neve");
+
+    await userEvent.click(screen.getByRole("button", { name: "Salvar item" }));
+    await waitFor(async () => {
+      const salvo = await dexieRepository.obterPedido(pedido.id);
+      expect(salvo?.itens.at(-1)?.cor).toBe("Branco neve");
+      expect(salvo?.itens.at(-1)?.qtd).toBe(3);
+    });
+  });
+
+  it("histórico: filtro ativo vira etiqueta removível e o menu da linha abre o pedido", async () => {
+    const { pedido } = await pedidoComItem();
+    await dexieRepository.salvarPedido({
+      ...(await dexieRepository.obterPedido(pedido.id))!,
+      status: "enviado",
+    });
+
+    abrir("/pedidos");
+    await screen.findByText("Tintas do Vale");
+
+    await userEvent.click(screen.getByRole("button", { name: "Filtros" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rascunhos" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    // O filtro aplicado fica visível como etiqueta — antes era só um número.
+    const etiqueta = await screen.findByRole("button", { name: /Rascunhos/ });
+    expect(await screen.findByText("Nenhum pedido neste filtro")).toBeDefined();
+
+    // Tocar na etiqueta limpa aquele filtro.
+    await userEvent.click(etiqueta);
+    expect(await screen.findByText("Tintas do Vale")).toBeDefined();
+  });
+
+  it("cadastrar um cliente novo dentro do fluxo volta com ele já selecionado", async () => {
+    const marca = await dexieRepository.salvarMarca({
+      nome: "MERKO",
+      visivelEmRelatorios: true,
+    });
+
+    abrir(`/pedidos/novo?marcaId=${marca.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "Escolher cliente" }));
+    await screen.findByRole("heading", { name: "Escolher cliente" });
+    await userEvent.click(await screen.findByRole("button", { name: "Novo cliente" }));
+
+    await screen.findByRole("heading", { name: "Novo cliente" });
+    await preencher(/^Nome(?! fantasia)/, "Depósito Primavera");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar cliente" }));
+
+    // Mesma armadilha da query string: o cadastro tambem precisa DEFINIR o
+    // clienteId na rota de retorno, nao concatenar mais uma copia.
+    await screen.findByRole("heading", { name: "Novo pedido" });
+    expect(await screen.findByText("Depósito Primavera")).toBeDefined();
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLSelectElement;
+    expect(campoMarca.value).toBe(marca.id);
+  });
+
+  it("desmarcar 'item promocional' desfaz o texto sugerido, mas preserva o que o vendedor escreveu", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    const promocional = await screen.findByRole("checkbox", { name: /Item com desconto/ });
+
+    // Marcar sugere o texto e abre o painel opcional.
+    await userEvent.click(promocional);
+    let campo = (await screen.findByLabelText(/Padrão \/ Complemento/)) as HTMLInputElement;
+    expect(campo.value).toBe("Valor promocional");
+
+    // Desmarcar tem de desfazer a sugestao — era o bug: o texto ficava para tras.
+    await userEvent.click(promocional);
+    campo = (await screen.findByLabelText(/Padrão \/ Complemento/)) as HTMLInputElement;
+    await waitFor(() => expect(campo.value).toBe(""));
+
+    // Ja um complemento digitado pelo vendedor nao pode ser apagado.
+    await preencher(/Padrão \/ Complemento/, "Pintura externa");
+    await userEvent.click(promocional);
+    await userEvent.click(promocional);
+    campo = (await screen.findByLabelText(/Padrão \/ Complemento/)) as HTMLInputElement;
+    expect(campo.value).toBe("Pintura externa");
+  });
+
+  it("no item, 'Trocar' produto volta para a busca sem travar o formulário", async () => {
+    await dexieRepository.substituirBaseProdutos(
+      [{ nome: "Verniz marítimo", embalagem: "Lata", valorUnit: 200 }],
+      "tabela.xlsx",
+    );
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    abrir(`/pedidos/${pedido.id}/item/novo`);
+    await preencher(/^Produto/, "verniz");
+    await userEvent.click(await screen.findByText("Verniz marítimo"));
+    await screen.findByRole("button", { name: "Lata" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Trocar" }));
+    // Volta a busca: o campo Produto reaparece e a embalagem escolhida some.
+    expect(await screen.findByLabelText(/^Produto/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Lata" })).toBeNull();
+  });
+
+  it("finalizar: o painel de entrega abre e o link 'usar do cliente' preenche o campo", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+      condicaoPagamento: "28/35/42 dias",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      // criarPedido copia a condicao do cliente; limpa para o link ter o que oferecer.
+      condicaoPagamento: "",
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    // Sem nada preenchido, o painel comeca fechado.
+    expect(screen.queryByLabelText(/Condição de pagamento/)).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /Entrega e pagamento/ }));
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Usar do cliente \(28\/35\/42 dias\)/ }),
+    );
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.condicaoPagamento).toBe(
+        "28/35/42 dias",
+      );
+    });
+  });
+
+  it("telefone do representante é gravado só com dígitos e sai mascarado na exportação", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    await screen.findByRole("heading", { name: "Finalizar pedido" });
+    await preencher(/^Telefone/, "11978319643");
+
+    // Guarda dígitos: antes gravava o texto exibido, que no 11º número ainda
+    // estava no formato de telefone fixo e ia torto para o Excel/PDF.
+    await waitFor(async () => {
+      expect((await dexieRepository.obterPedido(pedido.id))?.representanteTelefone).toBe(
+        "11978319643",
+      );
+    });
+
+    const campo = (await screen.findByLabelText(/^Telefone/)) as HTMLInputElement;
+    expect(campo.value).toBe("(11) 97831-9643");
+  });
+
+  it("pedido: o menu da capa leva para Finalizar", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+    await dexieRepository.salvarPedido({
+      ...pedido,
+      itens: [
+        { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Esmalte", valorUnit: 100 },
+      ],
+    });
+
+    abrir(`/pedidos/${pedido.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "Mais ações do pedido" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Finalizar pedido" }));
+    expect(await screen.findByRole("heading", { name: "Finalizar pedido" })).toBeDefined();
+  });
+
+  it("novo pedido sem nenhuma marca cadastrada explica o que fazer e bloqueia o início", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Teste",
+      cpfCnpj: "11222333000181",
+    });
+
+    abrir(`/pedidos/novo?clienteId=${cliente.id}`);
+    expect(await screen.findByText(/Nenhuma marca cadastrada ainda/)).toBeDefined();
+    const iniciar = await screen.findByRole("button", { name: "Iniciar pedido" });
+    expect(iniciar.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("finalizar: pendências ficam num bloco só e a exportação passa pela folha", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Sem Item",
+      cpfCnpj: "11222333000181",
+    });
+    const pedido = await dexieRepository.criarPedido({ clienteId: cliente.id, marca: "MERKO" });
+
+    abrir(`/pedidos/${pedido.id}/finalizar`);
+    expect(await screen.findByText("1 pendência antes de exportar")).toBeDefined();
+    expect(await screen.findByText("O pedido não tem itens.")).toBeDefined();
+
+    // Com pendência, a única ação da barra fica desligada.
+    const exportar = await screen.findByRole("button", { name: "Exportar" });
+    expect(exportar.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: /Exportar Excel/ })).toBeNull();
+  });
+});
+describe("cadastros (fase 2)", () => {
+  it("cadastro de cliente: cidade e UF são campos separados e continuam gravados juntos", async () => {
+    abrir("/clientes/novo");
+    await preencher(/^Nome(?! fantasia)/, "Depósito Primavera");
+
+    // O painel de endereço começa fechado num cadastro novo.
+    expect(screen.queryByLabelText(/^Cidade/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Endereço e contato/ }));
+
+    await preencher(/^Cidade/, "Três Lagoas");
+    await preencher(/^UF/, "ms");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar cliente" }));
+
+    await waitFor(async () => {
+      const [cliente] = await dexieRepository.listarClientes();
+      // Continua em `cidadeEstado`, no mesmo formato que a importação produz.
+      expect(cliente?.cidadeEstado).toBe("Três Lagoas / MS");
+    });
+  });
+
+  it("cadastro de cliente: sair com alteração pendente pede confirmação", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+    });
+
+    abrir(`/clientes/${cliente.id}`);
+    await screen.findByDisplayValue("Tintas do Vale");
+
+    // Sem mexer em nada, o voltar não incomoda.
+    await userEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(screen.queryByText(/alterações não salvas/)).toBeNull();
+
+    await preencher(/^Nome(?! fantasia)/, "Tintas do Vale Ltda");
+    await userEvent.click(screen.getByRole("button", { name: "Voltar" }));
+    expect(await screen.findByText(/alterações não salvas/)).toBeDefined();
+
+    // Cancelar mantém na tela, sem perder o que foi digitado.
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(
+      ((await screen.findByLabelText(/^Nome(?! fantasia)/)) as HTMLInputElement).value,
+    ).toBe("Tintas do Vale Ltda");
+  });
+
+  it("lista de clientes: a linha inteira abre o cadastro (o glifo ✎ deixou de existir)", async () => {
+    await dexieRepository.salvarCliente({
+      nome: "Casa da Tinta",
+      cpfCnpj: "52998224725",
+    });
+
+    abrir("/clientes");
+    expect(screen.queryByText("✎")).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: /Casa da Tinta/ }));
+    expect(await screen.findByDisplayValue("Casa da Tinta")).toBeDefined();
+  });
+
+  it("base de produtos avisa quando a lista foi cortada, em vez de cortar em silêncio", async () => {
+    await dexieRepository.substituirBaseProdutos(
+      Array.from({ length: 105 }, (_, i) => ({
+        nome: `Produto ${String(i).padStart(3, "0")}`,
+        embalagem: "Galão",
+        valorUnit: i + 1,
+      })),
+      "tabela.xlsx",
+    );
+
+    abrir("/produtos");
+    expect(await screen.findByText(/Mostrando os primeiros 100 de 105/)).toBeDefined();
+  });
+
+  it("importar produtos abre no passo 1 e só libera 'Conferir' com arquivo lido", async () => {
+    abrir("/produtos/importar");
+    expect(await screen.findByRole("heading", { name: "Importar produtos" })).toBeDefined();
+    expect(await screen.findByText(/Passo 1 de 3/)).toBeDefined();
+
+    // O mapeamento de colunas não aparece antes de existir arquivo — antes tudo
+    // vinha de uma vez na mesma rolagem.
+    expect(screen.queryByText(/colunas de embalagem/)).toBeNull();
+    const conferir = await screen.findByRole("button", { name: /Conferir/ });
+    expect(conferir.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("importar clientes abre no passo 1, sem despejar os 13 seletores de coluna", async () => {
+    abrir("/clientes/importar");
+    expect(await screen.findByText(/Passo 1 de 3/)).toBeDefined();
+    expect(screen.queryByLabelText(/Vira Nome \/ Razão social/)).toBeNull();
+    expect(await screen.findByRole("button", { name: "Escolher arquivo" })).toBeDefined();
+  });
+
+  it("cadastro de produto separa variante de embalagem/preço e explica a diferença", async () => {
+    abrir("/produtos/novo");
+    await screen.findByRole("heading", { name: "Novo produto" });
+
+    // "Detalhes" e "Variação" agora convivem num painel com a diferença dita.
+    expect(await screen.findByLabelText(/^Detalhes/)).toBeDefined();
+    expect(await screen.findByLabelText(/^Variação/)).toBeDefined();
+    expect(await screen.findByText(/distingue produtos de preços diferentes/)).toBeDefined();
+
+    await preencher(/^Nome/, "Verniz marítimo");
+    await preencher(/Valor unitário/, "200");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    await waitFor(async () => {
+      const [produto] = await dexieRepository.listarProdutos();
+      expect(produto?.nome).toBe("Verniz marítimo");
+      expect(produto?.valorUnit).toBe(200);
+    });
+  });
+});
+
+describe("marcas", () => {
+  it("cadastra uma marca e ela fica disponível no Novo pedido", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Tintas do Vale",
+      cpfCnpj: "11222333000181",
+    });
+
+    abrir("/marcas/nova");
+    await preencher(/Nome da marca/, "ARARA AZUL");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar marca" }));
+    await waitFor(async () => {
+      expect((await dexieRepository.listarMarcas()).map((m) => m.nome)).toEqual(["ARARA AZUL"]);
+    });
+    cleanup();
+
+    abrir(`/pedidos/novo?clienteId=${cliente.id}`);
+    const campoMarca = (await screen.findByLabelText(/^Marca/)) as HTMLSelectElement;
+    await screen.findByRole("option", { name: "ARARA AZUL" });
+    await userEvent.selectOptions(campoMarca, "ARARA AZUL");
+    await userEvent.click(screen.getByRole("button", { name: "Iniciar pedido" }));
+
+    await waitFor(async () => {
+      const [pedido] = await dexieRepository.listarPedidos();
+      expect(pedido?.marca).toBe("ARARA AZUL");
+      expect(pedido?.marcaId).toBeTruthy();
+    });
+  });
 });
 
 describe("clientes de teste", () => {
-  it("cria pelo botão em Configurações e depois exclui pela tela do cliente", async () => {
-    abrir("/config");
-    await userEvent.click(await screen.findByRole("button", { name: "Criar clientes de teste" }));
+  it("cria pelo botão no Ambiente de teste e depois exclui pela tela do cliente", async () => {
+    abrir("/config/teste");
+    await userEvent.click(await screen.findByRole("button", { name: /Clientes de teste/ }));
 
     await waitFor(async () => {
       expect(await dexieRepository.listarClientes()).toHaveLength(2);
@@ -851,7 +1598,8 @@ describe("check-in", () => {
 
     // Volta pra /checkins/novo já com o cliente escolhido e horário pré-preenchido
     // (padrão a hora atual — não mexe no campo, só confirma que salva assim mesmo).
-    await screen.findByText("Toque para trocar de cliente");
+    // A linha do cliente é tocável por inteiro: tocar nela troca de cliente.
+    await screen.findByRole("button", { name: /Cliente Visitado/ });
     const campoHorario = screen.getByLabelText(/^Horário/) as HTMLInputElement;
     expect(campoHorario.value).toMatch(/^\d{2}:\d{2}$/);
     await userEvent.click(screen.getByRole("button", { name: "Salvar check-in" }));
@@ -865,5 +1613,250 @@ describe("check-in", () => {
     // A lista de Check-in mostra o cliente e o horário salvos.
     expect(await screen.findByText("Cliente Visitado")).toBeDefined();
     expect(await screen.findByText(checkIn.hora)).toBeDefined();
+  });
+});
+
+describe("configurações, check-in e relatórios (fase 3)", () => {
+  it("configurações viram lista: a linha do representante abre o cadastro", async () => {
+    await dexieRepository.salvarRepresentante({
+      nome: "João Vendedor",
+      telefone: "11978319643",
+      email: "joao@exemplo.com",
+    });
+
+    abrir("/config");
+    // O telefone aparece mascarado no resumo da linha (é gravado só com dígitos).
+    const linha = await screen.findByRole("button", { name: /\(11\) 97831-9643/ });
+    await userEvent.click(linha);
+
+    expect(await screen.findByDisplayValue("João Vendedor")).toBeDefined();
+  });
+
+  it("em configurações, restaurar backup fica na zona de risco, longe de baixar", async () => {
+    abrir("/config");
+    expect(await screen.findByText("Zona de risco")).toBeDefined();
+
+    const restaurar = await screen.findByRole("button", { name: /Restaurar backup/ });
+    const baixar = await screen.findByRole("button", { name: /Baixar backup/ });
+    // Não são mais dois botões iguais um do lado do outro: só o destrutivo está
+    // no bloco de risco.
+    expect(restaurar.closest("div")?.contains(baixar)).toBe(false);
+  });
+
+  it("marcas nos relatórios: o grupo novo só é gravado ao confirmar", async () => {
+    await dexieRepository.salvarMarca({ nome: "MERKO", visivelEmRelatorios: true });
+
+    abrir("/config/marcas-relatorio");
+    await userEvent.click(await screen.findByRole("button", { name: "Novo grupo" }));
+
+    // Enquanto o nome não é confirmado, nada foi para o banco — antes o toque em
+    // "+ Novo grupo" já gravava um registro chamado "Novo grupo".
+    expect(await dexieRepository.listarGruposMarca()).toHaveLength(0);
+
+    await preencher(/Nome do novo grupo/, "Empresa A");
+    await userEvent.click(screen.getByRole("button", { name: "Criar grupo" }));
+
+    await waitFor(async () => {
+      const grupos = await dexieRepository.listarGruposMarca();
+      expect(grupos).toHaveLength(1);
+      expect(grupos[0].nome).toBe("Empresa A");
+    });
+  });
+
+  it("marcas nos relatórios: cancelar o grupo novo não deixa resíduo", async () => {
+    abrir("/config/marcas-relatorio");
+    await userEvent.click(await screen.findByRole("button", { name: "Novo grupo" }));
+    await preencher(/Nome do novo grupo/, "Descartado");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(await dexieRepository.listarGruposMarca()).toHaveLength(0);
+    expect(await screen.findByRole("button", { name: "Novo grupo" })).toBeDefined();
+  });
+
+  it("marcas nos relatórios: 'Desmarcar todas' tira todas dos totais de uma vez", async () => {
+    for (const nome of ["MERKO", "ARARA AZUL", "SUVINIL"]) {
+      await dexieRepository.salvarMarca({ nome, visivelEmRelatorios: true });
+    }
+
+    abrir("/config/marcas-relatorio");
+    await userEvent.click(await screen.findByRole("button", { name: "Desmarcar todas" }));
+
+    await waitFor(async () => {
+      const marcas = await dexieRepository.listarMarcas();
+      expect(marcas.every((m) => !m.visivelEmRelatorios)).toBe(true);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Marcar todas" }));
+    await waitFor(async () => {
+      const marcas = await dexieRepository.listarMarcas();
+      expect(marcas.every((m) => m.visivelEmRelatorios)).toBe(true);
+    });
+  });
+
+  it("check-in: excluir saiu de baixo do cartão e foi para o menu da linha", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Visitado",
+      cpfCnpj: "52998224725",
+    });
+    await dexieRepository.salvarCheckIn({
+      clienteId: cliente.id,
+      data: "2026-09-10",
+      hora: "09:30",
+    });
+
+    abrir("/checkins");
+    await screen.findByText("Cliente Visitado");
+    // O botão vermelho não fica mais colado na linha.
+    expect(screen.queryByRole("button", { name: "Excluir" })).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Ações do check-in de Cliente Visitado" }),
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Excluir" }));
+    await screen.findByText(/Esta ação não pode ser desfeita/);
+    await userEvent.click(screen.getAllByRole("button", { name: "Excluir" })[0]);
+
+    await waitFor(async () => {
+      expect(await dexieRepository.listarCheckIns()).toHaveLength(0);
+    });
+  });
+
+  it("check-in: 'Agora' devolve data e hora atuais depois de editadas", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Visitado",
+      cpfCnpj: "52998224725",
+    });
+    const checkIn = await dexieRepository.salvarCheckIn({
+      clienteId: cliente.id,
+      data: "2020-01-02",
+      hora: "08:15",
+    });
+
+    abrir(`/checkins/${checkIn.id}`);
+    // O campo monta com a data de hoje e só depois recebe a do check-in salvo.
+    const campoData = (await screen.findByDisplayValue("2020-01-02")) as HTMLInputElement;
+
+    await userEvent.click(screen.getByRole("button", { name: "Agora" }));
+    expect(campoData.value).toBe(new Date().toISOString().slice(0, 10));
+    // Já em "agora", o atalho some — não há o que atalhar.
+    expect(screen.queryByRole("button", { name: "Agora" })).toBeNull();
+  });
+
+  it("relatórios: filtrar por marca vira etiqueta removível, e limpar volta ao total", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    for (const [nome, valor] of [
+      ["MERKO", 100],
+      ["ARARA AZUL", 900],
+    ] as const) {
+      const marca = await dexieRepository.salvarMarca({ nome, visivelEmRelatorios: true });
+      const pedido = await dexieRepository.criarPedido({
+        clienteId: cliente.id,
+        marca: nome,
+        marcaId: marca.id,
+      });
+      await dexieRepository.salvarPedido({
+        ...pedido,
+        status: "enviado",
+        itens: [
+          { item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Item", valorUnit: valor },
+        ],
+      });
+    }
+
+    abrir("/relatorios");
+    // Os números agora vêm na capa, antes de qualquer controle de filtro.
+    const rotulo = await screen.findByText("Total vendido");
+    expect(await within(rotulo.parentElement!).findByText("R$ 1.000,00")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: /MERKO/ }));
+    expect(await within(rotulo.parentElement!).findByText("R$ 100,00")).toBeDefined();
+
+    // O filtro fica visível como etiqueta — antes só dava pra saber olhando o chip.
+    await userEvent.click(await screen.findByRole("button", { name: "Limpar" }));
+    expect(await within(rotulo.parentElement!).findByText("R$ 1.000,00")).toBeDefined();
+  });
+
+  it("relatórios: filtro sem resultado oferece limpar os filtros", async () => {
+    const cliente = await dexieRepository.salvarCliente({
+      nome: "Cliente Real",
+      cpfCnpj: "52998224725",
+    });
+    const marca = await dexieRepository.salvarMarca({ nome: "MERKO", visivelEmRelatorios: true });
+    const outra = await dexieRepository.salvarMarca({
+      nome: "ARARA AZUL",
+      visivelEmRelatorios: true,
+    });
+    const hoje = new Date();
+    const mesPassadoDate = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 15);
+    const mesPassado = `${mesPassadoDate.getFullYear()}-${String(
+      mesPassadoDate.getMonth() + 1,
+    ).padStart(2, "0")}-15`;
+
+    for (const [m, data] of [
+      [marca, `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-15`],
+      [outra, mesPassado],
+    ] as const) {
+      const pedido = await dexieRepository.criarPedido({
+        clienteId: cliente.id,
+        marca: m.nome,
+        marcaId: m.id,
+      });
+      await dexieRepository.salvarPedido({
+        ...pedido,
+        status: "enviado",
+        dataPedido: data,
+        itens: [{ item: 1, qtd: 1, embalagem: "Galão", descricaoProduto: "Item", valorUnit: 100 }],
+      });
+    }
+
+    abrir("/relatorios");
+    // Filtra por uma marca que só tem pedido no mês passado: o mês atual esvazia.
+    await userEvent.click(await screen.findByRole("button", { name: /ARARA AZUL/ }));
+    expect(await screen.findByText("Nenhum pedido enviado neste filtro")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(await screen.findByText("Total vendido")).toBeDefined();
+  });
+});
+
+describe("ambiente de teste → relatório (fiação da tela nova)", () => {
+  it("criar os dados de Relatório pela lista do Ambiente de teste enche o Relatório de teste", async () => {
+    abrir("/config/teste");
+    await userEvent.click(await screen.findByRole("button", { name: /Dados de Relatório/ }));
+
+    await waitFor(async () => {
+      const pedidos = await dexieRepository.listarPedidos({ status: "enviado" });
+      expect(pedidos.filter((p) => p.teste).length).toBeGreaterThan(0);
+    });
+    cleanup();
+
+    abrir("/relatorios/teste");
+    expect(await screen.findByText("Total vendido")).toBeDefined();
+  });
+});
+
+describe("relatório de teste sem dados", () => {
+  it("oferece criar o conjunto fictício na própria tela, em vez de dar tela vazia", async () => {
+    abrir("/relatorios/teste");
+
+    // Antes aparecia "Pedidos enviados aparecem aqui assim que você exportar o
+    // primeiro" — mensagem do relatório real, sem saída no modo Teste.
+    expect(await screen.findByText("Nenhum dado fictício ainda")).toBeDefined();
+    await userEvent.click(screen.getByRole("button", { name: "Criar dados de teste" }));
+
+    expect(await screen.findByText("Total vendido")).toBeDefined();
+    await waitFor(async () => {
+      const pedidos = await dexieRepository.listarPedidos({ status: "enviado" });
+      expect(pedidos.filter((p) => p.teste).length).toBeGreaterThan(0);
+    });
+
+    // E o relatório real continua limpo desses números.
+    cleanup();
+    abrir("/relatorios");
+    await userEvent.click(await screen.findByRole("button", { name: "Tudo" }));
+    expect(await screen.findByText("Nenhum pedido enviado neste filtro")).toBeDefined();
   });
 });

@@ -1,10 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useRepository } from "../../data/RepositoryContext";
+import { useDados } from "../../hooks/useDados";
 import { Button } from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/Confirm";
-import { Input } from "../../components/ui/Field";
-import { BarraInferior, Cartao, EstadoVazio, Tela } from "../../components/ui/Layout";
+import { Select } from "../../components/ui/Field";
+import {
+  BarraInferior,
+  BotaoCapa,
+  EstadoVazio,
+  Sheet,
+  Tela,
+} from "../../components/ui/Layout";
+import { Painel } from "../../components/ui/Painel";
+import { LinhaLista } from "../../components/ui/LinhaLista";
+import { Etiqueta } from "../../components/ui/Etiqueta";
+import {
+  IconeCliente,
+  IconeExcluir,
+  IconeMaisAcoes,
+  IconeProduto,
+  IconeSeta,
+  IconeSomar,
+} from "../../components/ui/icones";
 import { useToast } from "../../components/ui/Toast";
 import { formatarMoeda, totaisPedido, totalItem } from "../../domain/calculos";
 import { mensagemErro } from "../../domain/erros";
@@ -21,6 +39,11 @@ export function PedidoPage() {
   const { pedido, cliente, carregando, atualizar } = usePedido(id);
   const [excluindo, setExcluindo] = useState(false);
   const [editandoCabecalho, setEditandoCabecalho] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
+
+  const marcaIdParam = params.get("marcaId") ?? "";
+  // marcaIdParam nas deps: ao voltar do cadastro de marca, a lista recarrega já com a nova.
+  const { dados: marcas } = useDados(() => repo.listarMarcas(), [repo, marcaIdParam]);
 
   // Volta de /clientes?selecionar=1&retorno=/pedidos/:id com ?clienteId= na
   // URL — troca o cliente do pedido e limpa a query string.
@@ -35,6 +58,21 @@ export function PedidoPage() {
       void atualizar({ clienteId: novoClienteId });
     }
   }, [params, pedido, atualizar, navigate]);
+
+  // Volta de /marcas/nova?retorno=/pedidos/:id com ?marcaId= na URL — aplica a
+  // marca recém-cadastrada ao pedido e limpa a query string.
+  const trocaMarcaProcessada = useRef(false);
+  useEffect(() => {
+    if (trocaMarcaProcessada.current) return;
+    if (!marcaIdParam || !pedido || !marcas) return;
+    const nova = marcas.find((m) => m.id === marcaIdParam);
+    if (!nova) return;
+    trocaMarcaProcessada.current = true;
+    navigate(`/pedidos/${pedido.id}`, { replace: true });
+    if (nova.id !== pedido.marcaId) {
+      void atualizar({ marca: nova.nome, marcaId: nova.id });
+    }
+  }, [marcaIdParam, pedido, marcas, atualizar, navigate]);
 
   if (carregando) {
     return (
@@ -55,14 +93,6 @@ export function PedidoPage() {
   const identificador = pedido.somenteOrcamento
     ? `Orçamento ${pedido.codigoOrcamento}`
     : `Pedido nº ${pedido.numero}`;
-
-  async function removerItem(indice: number) {
-    if (!pedido) return;
-    const itens = pedido.itens
-      .filter((_, i) => i !== indice)
-      .map((item, i) => ({ ...item, item: i + 1 }));
-    await atualizar({ itens });
-  }
 
   async function excluirPedido() {
     if (!pedido) return;
@@ -90,104 +120,121 @@ export function PedidoPage() {
   }
 
   return (
-    <Tela titulo={identificador} voltar="/" comBarraInferior>
-      <Cartao>
-        {editandoCabecalho ? (
-          <>
-            <Input
-              rotulo="Marca"
-              placeholder="Ex.: MERKO, ARARA AZUL"
-              value={pedido.marca}
-              onChange={(e) => atualizar({ marca: e.target.value })}
-            />
-            <div className="texto-suave">{cliente?.nome ?? "Cliente removido"}</div>
-            <div className="linha linha--entre">
-              <Button
-                variante="secundario"
-                onClick={() =>
-                  navigate(
-                    `/clientes?selecionar=1&retorno=${encodeURIComponent(`/pedidos/${pedido.id}`)}`,
-                  )
-                }
-              >
-                Trocar cliente
-              </Button>
-              <Button variante="fantasma" onClick={() => setEditandoCabecalho(false)}>
-                Concluir
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className={css.linhaCabecalho}>
-            <div className={css.linhaCabecalhoInfo}>
-              <div className="texto-forte">{cliente?.nome ?? "Cliente removido"}</div>
-              <div className="texto-suave">{pedido.marca || "Sem marca"}</div>
-            </div>
+    <Tela
+      titulo={identificador}
+      subtitulo={[cliente?.nome ?? "Cliente removido", pedido.marca || "Sem marca"].join(" · ")}
+      voltar="/"
+      capa
+      comBarraInferior
+      acao={
+        <BotaoCapa rotulo="Mais ações do pedido" onClick={() => setMenuAberto(true)}>
+          <IconeMaisAcoes size={19} />
+        </BotaoCapa>
+      }
+    >
+      {editandoCabecalho ? (
+        <Painel titulo="Cliente e marca" icone={<IconeCliente size={17} />}>
+          <Select
+            rotulo="Marca"
+            value={pedido.marcaId ?? ""}
+            onChange={(e) => {
+              const marca = marcas?.find((m) => m.id === e.target.value);
+              if (marca) void atualizar({ marca: marca.nome, marcaId: marca.id });
+            }}
+          >
+            {!pedido.marcaId && <option value="">{pedido.marca || "Selecione a marca"}</option>}
+            {marcas?.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome}
+              </option>
+            ))}
+          </Select>
+          <Button
+            variante="fantasma"
+            onClick={() =>
+              navigate(`/marcas/nova?retorno=${encodeURIComponent(`/pedidos/${pedido.id}`)}`)
+            }
+          >
+            + Cadastrar nova marca
+          </Button>
+          <div className="texto-suave">{cliente?.nome ?? "Cliente removido"}</div>
+          <div className="linha linha--entre">
             <Button
-              variante="fantasma"
-              className={css.botaoEditar}
-              aria-label="Editar cliente ou marca"
-              onClick={() => setEditandoCabecalho(true)}
+              variante="secundario"
+              onClick={() =>
+                navigate(
+                  `/clientes?selecionar=1&retorno=${encodeURIComponent(`/pedidos/${pedido.id}`)}`,
+                )
+              }
             >
-              ✎
+              Trocar cliente
+            </Button>
+            <Button variante="fantasma" onClick={() => setEditandoCabecalho(false)}>
+              Concluir
             </Button>
           </div>
-        )}
-      </Cartao>
-
-      <Button variante="perigo" onClick={excluirPedido} disabled={excluindo}>
-        {excluindo ? "Excluindo…" : "Excluir pedido"}
-      </Button>
-
-      <div className="linha linha--entre">
-        <h2 className="secao-titulo">Itens ({pedido.itens.length})</h2>
-        <Button variante="secundario" onClick={() => navigate(`/pedidos/${pedido.id}/item/novo`)}>
-          + Adicionar item
-        </Button>
-      </div>
-
-      {pedido.itens.length === 0 ? (
-        <EstadoVazio
-          titulo="Nenhum item"
-          descricao="Adicione o primeiro produto do pedido."
-        />
+        </Painel>
       ) : (
-        <div className="pilha">
-          {pedido.itens.map((item, indice) => (
-            <Cartao key={indice}>
-              <div className="linha linha--entre">
-                <span className="texto-forte">
-                  {item.item}. {item.descricaoProduto}
-                  {item.comDesconto && <span className={css.tagPromocional}>Promocional</span>}
-                </span>
-                <span className="texto-forte">{formatarMoeda(totalItem(item))}</span>
-              </div>
-              <div className="texto-suave">
-                {item.qtd} × {formatarMoeda(item.valorUnit)}
-                {item.embalagem ? ` · ${item.embalagem}` : ""}
-                {item.cor ? ` · ${item.cor}` : ""}
-                {item.padraoComplemento ? ` · ${item.padraoComplemento}` : ""}
-              </div>
-              {item.descricao && <div className="texto-suave">{item.descricao}</div>}
-              <div className={css.acoesItem}>
-                <Button
-                  variante="fantasma"
-                  onClick={() => navigate(`/pedidos/${pedido.id}/item/${indice}`)}
-                >
-                  Editar
-                </Button>
-                <Button variante="perigo" onClick={() => removerItem(indice)}>
-                  Remover
-                </Button>
-              </div>
-            </Cartao>
-          ))}
-        </div>
+        <Painel>
+          <LinhaLista
+            icone={<IconeCliente size={17} />}
+            titulo={cliente?.nome ?? "Cliente removido"}
+            meta={pedido.marca || "Sem marca"}
+            onClick={() => setEditandoCabecalho(true)}
+          />
+        </Painel>
       )}
+
+      <Painel
+        titulo={`Itens (${pedido.itens.length})`}
+        icone={<IconeProduto size={17} />}
+        acao={
+          <Button
+            variante="fantasma"
+            className={css.acaoPainel}
+            aria-label="Adicionar item"
+            onClick={() => navigate(`/pedidos/${pedido.id}/item/novo`)}
+          >
+            <IconeSomar size={15} />
+            Adicionar
+          </Button>
+        }
+      >
+        {pedido.itens.length === 0 ? (
+          <EstadoVazio titulo="Nenhum item" descricao="Adicione o primeiro produto do pedido." />
+        ) : (
+          <div className="pilha pilha--apertada">
+            {pedido.itens.map((item, indice) => (
+              <LinhaLista
+                key={indice}
+                acento={item.comDesconto ? "alerta" : "info"}
+                titulo={
+                  <>
+                    {item.descricaoProduto}
+                    {item.comDesconto && <Etiqueta variante="alerta">Promo</Etiqueta>}
+                  </>
+                }
+                meta={[
+                  `${item.qtd} × ${formatarMoeda(item.valorUnit)}`,
+                  item.embalagem,
+                  item.cor,
+                  item.padraoComplemento,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                valor={formatarMoeda(totalItem(item))}
+                onClick={() => navigate(`/pedidos/${pedido.id}/item/${indice}`)}
+              />
+            ))}
+          </div>
+        )}
+      </Painel>
 
       <BarraInferior>
         <div className={css.totalBarra}>
-          <span className="texto-suave">Total</span>
+          <span className="texto-suave">
+            Total{pedido.itens.length > 0 ? ` · ${pedido.itens.length} itens` : ""}
+          </span>
           <span className={css.totalValor}>{formatarMoeda(total)}</span>
         </div>
         <Button
@@ -195,8 +242,46 @@ export function PedidoPage() {
           disabled={pedido.itens.length === 0}
         >
           Resumo
+          <IconeSeta size={17} />
         </Button>
       </BarraInferior>
+
+      <Sheet titulo="Ações do pedido" aberto={menuAberto} aoFechar={() => setMenuAberto(false)}>
+        <Button
+          variante="secundario"
+          bloco
+          onClick={() => {
+            setMenuAberto(false);
+            setEditandoCabecalho(true);
+          }}
+        >
+          Editar cliente ou marca
+        </Button>
+        {pedido.itens.length > 0 && (
+          <Button
+            variante="secundario"
+            bloco
+            onClick={() => {
+              setMenuAberto(false);
+              navigate(`/pedidos/${pedido.id}/finalizar`);
+            }}
+          >
+            Finalizar pedido
+          </Button>
+        )}
+        <Button
+          variante="perigo"
+          bloco
+          onClick={() => {
+            setMenuAberto(false);
+            void excluirPedido();
+          }}
+          disabled={excluindo}
+        >
+          <IconeExcluir size={17} />
+          {excluindo ? "Excluindo…" : "Excluir pedido"}
+        </Button>
+      </Sheet>
     </Tela>
   );
 }

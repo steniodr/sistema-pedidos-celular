@@ -4,7 +4,7 @@
  * — nada aqui é gerado automaticamente a partir de commits/PRs.
  */
 
-export const VERSAO_APP = "1.10";
+export const VERSAO_APP = "2.0";
 
 export interface EntradaChangelog {
   versao: string;
@@ -14,6 +14,22 @@ export interface EntradaChangelog {
 
 /** Mais recente primeiro. */
 export const CHANGELOG: EntradaChangelog[] = [
+  {
+    versao: "2.0",
+    data: "2026-09-10",
+    itens: [
+      "Visual novo em todo o app: cada tela abre com uma capa que já mostra o número que importa, os campos ficam agrupados em painéis, e há ícones e logo próprios. As listas (Histórico, Clientes, Produtos, Check-in) passaram a ter o mesmo formato — uma linha por registro, com um menu “⋯” para as ações.",
+      "Marcas agora são cadastro: a Tela Inicial → “Cadastros” reúne Clientes, Produtos e Marcas. No pedido, a marca é escolhida numa lista (com atalho “+ Cadastrar nova marca”); pedidos antigos viram cadastro sozinhos, sem perder nada.",
+      "Orçamento: em Finalizar, “Exportar” → “Salvar como orçamento e voltar” mostra um card para conferir o código (ex.: ORC04) e confirmar. O orçamento entra na hora nos Relatórios; depois dá para “Converter em pedido”. Substitui a antiga caixa “Somente orçamento”.",
+      "Histórico e Tela Inicial: orçamento aparece como “Orçado” (no mesmo tom do rascunho), não mais como “Enviado” verde — que passava ideia de venda fechada.",
+      "Relatórios: recorte “Orçados” separado de “Reais” e “Teste” — orçamentos têm o próprio relatório e nunca entram nos números de venda. No Histórico, o total do topo também deixa orçamento e pedido de teste de fora (eles continuam na lista, com etiqueta).",
+      "Relatórios: nova visão “Por marca”, filtro com várias marcas de uma vez e grupos de marcas (ex.: “Empresa A”); período por tipo (Semana/Mês) com setas para navegar e opção de somar mais de um mês ou semana no mesmo relatório.",
+      "Relatórios: corrigida a diferença entre o “Total vendido” do card e o total do gráfico — o desconto do pedido passa a ser rateado entre os itens, então a soma por produto/categoria bate com o card.",
+      "Configurações: “Marcas nos relatórios” decide quais marcas entram nos números (as desligadas somem até de “Tudo”) e monta os grupos; os botões de dados de teste viraram um “Ambiente de teste” só, com um Relatório de teste (várias semanas e meses em 3 marcas) que nunca aparece nos números reais.",
+      "Cadastro de cliente: endereço e contato num painel que só abre quando precisa; cidade e UF em campos separados; sair com alteração não salva pede confirmação.",
+      "Se o app é atualizado com a aba aberta, exportar ou importar não falha mais em silêncio — aparece um aviso “Recarregar” explicando que a aba está velha.",
+    ],
+  },
   {
     versao: "1.10",
     data: "2026-09-09",

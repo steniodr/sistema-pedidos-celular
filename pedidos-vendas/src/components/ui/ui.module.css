@@ -269,6 +269,12 @@
   font-weight: 600;
 }
 
+/* Orçamento "enviado" — mesmo tom de atenção do rascunho, não o verde de venda fechada. */
+.status--orcado {
+  color: var(--cor-alerta);
+  font-weight: 600;
+}
+
 /* ---------- Barra superior ---------- */
 .barraTopo {
   position: sticky;
@@ -399,4 +405,23 @@
 
 .calendarioDia--selecionado.calendarioDia--comDados::after {
   background: #fff;
+}
+
+/* ---------- Chips: 3 papeis (unico / multi / token) ---------- */
+.chip--multi { display: inline-flex; align-items: center; gap: 6px; }
+
+.chip--multi.chip--ativo {
+  background: var(--cor-primaria-clara);
+  border-color: var(--cor-primaria);
+  color: var(--cor-primaria-escura);
+}
+
+.chip--token {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-weight: 600;
 }

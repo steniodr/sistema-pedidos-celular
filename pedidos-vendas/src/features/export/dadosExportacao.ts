@@ -71,7 +71,12 @@ export function montarDadosExportacao(
     },
     representante: {
       nome: pedido.representanteNome ?? "",
-      telefone: pedido.representanteTelefone ?? "",
+      // Mascara na saida, igual ao telefone do cliente logo acima. Alem de
+      // padronizar, conserta cadastros antigos que guardaram o texto meio
+      // formatado enquanto o vendedor digitava (ex.: "(11) 9783-19643").
+      telefone: pedido.representanteTelefone
+        ? mascararTelefone(pedido.representanteTelefone)
+        : "",
       email: pedido.representanteEmail ?? "",
     },
     itens: pedido.itens.map((item) => ({

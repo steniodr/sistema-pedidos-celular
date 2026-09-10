@@ -1,7 +1,9 @@
 import type {
   CheckIn,
   Cliente,
+  GrupoMarca,
   ImportacaoInfo,
+  Marca,
   Pedido,
   Produto,
   Representante,
@@ -61,6 +63,21 @@ export interface Repository {
   /** Próximo código de orçamento disponível (ex.: "ORC01", "ORC02"...) — contador próprio, independente de `numero`. */
   proximoCodigoOrcamento(): Promise<string>;
 
+  // Marcas (cadastro prévio — padroniza cabeçalho da planilha e agrupamento de Relatórios)
+  /** Ordenado por nome. Exclui marcas `teste` a menos que `incluirTeste`. */
+  listarMarcas(opts?: { incluirTeste?: boolean }): Promise<Marca[]>;
+  obterMarca(id: string): Promise<Marca | undefined>;
+  /** Cria ou atualiza uma marca. Ao criar, casa por nome normalizado para não duplicar. */
+  salvarMarca(entrada: EntradaMarca): Promise<Marca>;
+  removerMarca(id: string): Promise<void>;
+  /** Quantos pedidos referenciam cada marca (por `marcaId` ou, em legado, pelo nome). */
+  contarPedidosPorMarca(): Promise<Map<string, number>>;
+
+  // Grupos de marcas (persistidos em `meta`)
+  listarGruposMarca(): Promise<GrupoMarca[]>;
+  salvarGrupoMarca(grupo: EntradaGrupoMarca): Promise<GrupoMarca>;
+  removerGrupoMarca(id: string): Promise<void>;
+
   // Check-in (visita ao cliente, independente de pedido)
   listarCheckIns(filtro?: FiltroCheckIns): Promise<CheckIn[]>;
   obterCheckIn(id: string): Promise<CheckIn | undefined>;
@@ -78,14 +95,21 @@ export interface Repository {
   /** Substitui clientes, produtos, pedidos e configuração pelo conteúdo do backup. */
   restaurarBackup(dados: BackupDados): Promise<void>;
 
-  /** Apaga todos os clientes e pedidos marcados como `teste` (gerados em Configurações). */
+  /** Apaga todos os clientes, pedidos e marcas marcados como `teste` (gerados no Ambiente de teste). */
   removerDadosTeste(): Promise<RemocaoDadosTeste>;
 }
 
 export interface RemocaoDadosTeste {
   clientes: number;
   pedidos: number;
+  marcas: number;
 }
+
+export type EntradaMarca = Omit<Marca, "id" | "criadoEm" | "atualizadoEm"> & {
+  id?: string;
+};
+
+export type EntradaGrupoMarca = Omit<GrupoMarca, "id"> & { id?: string };
 
 export type EntradaCliente = Omit<Cliente, "id" | "criadoEm" | "atualizadoEm"> & {
   id?: string;
@@ -109,6 +133,8 @@ export type EntradaProdutoUnico = EntradaProduto & { id?: string };
 export interface NovoPedido {
   clienteId: string;
   marca: string;
+  /** Referência à `Marca` cadastrada escolhida no fluxo do pedido. */
+  marcaId?: string;
 }
 
 export interface FiltroPedidos {
@@ -137,6 +163,8 @@ export interface BackupDados {
   produtos: Produto[];
   pedidos: Pedido[];
   checkIns?: CheckIn[];
+  marcas?: Marca[];
+  gruposMarca?: GrupoMarca[];
   representante?: Representante;
   ultimaImportacao?: ImportacaoInfo;
 }
