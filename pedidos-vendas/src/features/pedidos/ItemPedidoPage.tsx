@@ -74,7 +74,9 @@ export function ItemPedidoPage() {
   const [erroQtd, setErroQtd] = useState<string | undefined>();
   const [erroValorUnit, setErroValorUnit] = useState<string | undefined>();
   const [salvando, setSalvando] = useState(false);
-  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  // Item novo já abre com os opcionais visíveis (o vendedor pode fechar se
+  // quiser); editando um item existente, continua fechado por padrão.
+  const [detalhesAbertos, setDetalhesAbertos] = useState(!editando);
 
   useEffect(() => {
     if (!pedido) return;

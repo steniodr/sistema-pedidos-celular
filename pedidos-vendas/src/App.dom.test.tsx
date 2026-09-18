@@ -1152,9 +1152,9 @@ describe("redesenho — comportamentos novos", () => {
       expect((await screen.findAllByText("R$ 150,00")).length).toBeGreaterThan(1);
     });
 
-    // Painel "Detalhes opcionais" começa fechado; abrir mantém o que foi digitado.
-    expect(screen.queryByLabelText(/^Cor/)).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /Detalhes opcionais/ }));
+    // Painel "Detalhes opcionais" já abre num item novo; fechar e reabrir
+    // mantém o que foi digitado.
+    expect(screen.getByLabelText(/^Cor/)).toBeDefined();
     await preencher(/^Cor/, "Branco neve");
     await userEvent.click(screen.getByRole("button", { name: /Detalhes opcionais/ }));
     expect(screen.queryByLabelText(/^Cor/)).toBeNull();
